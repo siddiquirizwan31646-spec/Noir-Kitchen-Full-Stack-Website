@@ -1,2 +1,1 @@
-# Noir-Kitchen-Full-Stack-Website
-Full-stack restaurant web app for Noir Kitchen — scroll-driven canvas animations, JWT auth, OTP verification, cart &amp; food ordering, table reservations, and an admin dashboard. Built with React, Node.js, and MongoDB.
+Noir Kitchen is a premium full-stack restaurant experience built with React + Vite on the frontend and Node.js/Express + MongoDB on the backend. Features include a 178-frame scroll-driven canvas animation, JWT + Google OAuth authentication, OTP email verification, a full cart and food ordering system, table reservations, and role-based routing — all wrapped in a dark luxury UI.
