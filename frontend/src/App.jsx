@@ -5,7 +5,7 @@ import Home from "./Pages/Home";
 import MainHome from "./Pages/MainHome";
 import LoginPage from "./Pages/login";
 import SignupPage from "./Pages/Signup";
-import OTPVerify from "./Pages/OTPVerify";
+import OTPVerify from "./Pages/Otpverify";
 import AuthCallback from "./Pages/AuthCallback";
 import Profile from "./Pages/Profile";
 import ReviewPage from "./Pages/ReviewPage";
