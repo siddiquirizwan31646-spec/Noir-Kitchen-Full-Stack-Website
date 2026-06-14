@@ -10,7 +10,7 @@ const chefRoutes = require("./routes/chefRoutes");
 const connectDB = require('./config/db');
 require('./config/passport');
 
-const authRoutes    = require('./routes/auth');
+const authRoutes    = require('./routes/Auth');
 const reviewRoutes  = require('./routes/reviewRoutes');
 const contactRoute  = require('./routes/contact');
 const momentRoutes  = require('./routes/moments');
