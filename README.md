@@ -1,0 +1,1 @@
+Noir Kitchen is a premium full-stack restaurant experience built with React + Vite on the frontend and Node.js/Express + MongoDB on the backend. Features include a 178-frame scroll-driven canvas animation, JWT + Google OAuth authentication, OTP email verification, a full cart and food ordering system, table reservations, and role-based routing — all wrapped in a dark luxury UI.
