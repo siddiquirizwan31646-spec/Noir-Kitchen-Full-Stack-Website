@@ -27,19 +27,11 @@ const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 // ─── Route Guards ────────────────────────────────────────────────────────────
 
-/**
- * PrivateRoute – only accessible when logged in.
- * Redirects unauthenticated users to /login.
- */
 function PrivateRoute({ user, children }) {
   if (!user) return <Navigate to="/login" replace />;
   return children;
 }
 
-/**
- * PublicRoute – only accessible when NOT logged in (login, signup).
- * Redirects authenticated users to /dashboard.
- */
 function PublicRoute({ user, children }) {
   if (user) {
     const token = localStorage.getItem("token");
@@ -97,19 +89,25 @@ function AppRoutes() {
     navigate(`/dashboard?token=${token}`, { replace: true });
   };
 
-  const handleLogout = async () => {
+  // ── FIXED: clear state FIRST, navigate AFTER, API call is fire-and-forget ──
+  const handleLogout = () => {
     const token = localStorage.getItem("token");
-    await fetch(`${API}/api/auth/logout`, {
+
+    // 1. Clear everything synchronously so PrivateRoute sees null immediately
+    localStorage.removeItem("token");
+    setUser(null);
+
+    // 2. Navigate to landing page
+    navigate("/", { replace: true });
+
+    // 3. Tell backend to clear the cookie (non-blocking — we don't await this)
+    fetch(`${API}/api/auth/logout`, {
       method: "POST",
       credentials: "include",
       headers: { Authorization: `Bearer ${token}` },
     }).catch(() => {});
-    localStorage.removeItem("token");
-    setUser(null);
-    navigate("/", { replace: true });
   };
 
-  // Show a spinner while the auth check is in flight
   if (checking) {
     return (
       <div style={{
@@ -131,7 +129,7 @@ function AppRoutes() {
   return (
     <Routes>
 
-      {/* ── Fully public (no auth required) ───────────────────────────────── */}
+      {/* ── Fully public ──────────────────────────────────────────────────── */}
 
       <Route
         path="/"
@@ -142,8 +140,8 @@ function AppRoutes() {
         }
       />
 
-      {/* Auth callback & OTP don't need a guard – they're part of the login flow */}
       <Route path="/auth/callback" element={<AuthCallback onSuccess={handleLoginSuccess} />} />
+
       <Route
         path="/verify-otp"
         element={
@@ -159,7 +157,7 @@ function AppRoutes() {
         }
       />
 
-      {/* ── Public-only routes (redirect to dashboard if already logged in) ── */}
+      {/* ── Public-only (logged-in users → dashboard) ─────────────────────── */}
 
       <Route
         path="/login"
@@ -188,7 +186,7 @@ function AppRoutes() {
         }
       />
 
-      {/* ── Private routes (redirect to /login if not logged in) ─────────── */}
+      {/* ── Private routes ────────────────────────────────────────────────── */}
 
       <Route
         path="/dashboard"
