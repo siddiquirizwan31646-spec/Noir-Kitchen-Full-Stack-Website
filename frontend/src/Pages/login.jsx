@@ -53,15 +53,50 @@ function AddressFields({ address, setAddress, focusedField, setFocused }) {
   );
 }
 
+// ── Google Loading Overlay ────────────────────────────────────────────────────
+function GoogleLoadingOverlay() {
+  return (
+    <div className="gl-overlay">
+      <div className="gl-card">
+        {/* Logo */}
+        <img
+          src="https://i.postimg.cc/hG4FkpbT/Chat-GPT-Image-Jun-6-2026-05-29-17-PM.png"
+          alt="Noir Kitchen"
+          className="gl-logo"
+        />
+        <div className="gl-brand">
+          <span className="gl-noir">NOIR</span>
+          <span className="gl-kitchen">KITCHEN</span>
+        </div>
+
+        {/* Spinner */}
+        <div className="gl-spinner-wrap">
+          <div className="gl-ring" />
+          <div className="gl-ring gl-ring-2" />
+        </div>
+
+        <p className="gl-title">Connecting to Google</p>
+        <p className="gl-sub">Redirecting you securely…</p>
+
+        {/* Animated dots */}
+        <div className="gl-dots">
+          <span /><span /><span />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main login page ───────────────────────────────────────────────────────────
 export default function LoginPage({ onLoginSuccess, onSwitchToSignup }) {
-  const [email, setEmail]       = useState("");
-  const [password, setPassword] = useState("");
-  const [showPw, setShowPw]     = useState(false);
-  const [loading, setLoading]   = useState(false);
-  const [error, setError]       = useState("");
-  const [focused, setFocused]   = useState("");
-  const [address, setAddress]   = useState({
+  const [email, setEmail]           = useState("");
+  const [password, setPassword]     = useState("");
+  const [showPw, setShowPw]         = useState(false);
+  const [loading, setLoading]       = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);   // ← NEW
+  const [error, setError]           = useState("");
+  const [focused, setFocused]       = useState("");
+  const [address, setAddress]       = useState({
     houseNo: "", areaName: "", areaNo: "", city: "", pinCode: ""
   });
   const navigate = useNavigate();
@@ -79,7 +114,6 @@ export default function LoginPage({ onLoginSuccess, onSwitchToSignup }) {
     return () => ctx.revert();
   }, []);
 
-  // ── Validate address ────────────────────────────────────────────────────────
   const validateAddress = () => {
     const { houseNo, areaName, city, pinCode } = address;
     if (!houseNo.trim())   return "House / Flat No. is required.";
@@ -99,7 +133,6 @@ export default function LoginPage({ onLoginSuccess, onSwitchToSignup }) {
 
     setError(""); setLoading(true);
     try {
-      // Save address to session storage — backend will persist after OTP verification
       sessionStorage.setItem("otpEmail",    email);
       sessionStorage.setItem("otpPassword", password);
       sessionStorage.setItem("otpAddress",  JSON.stringify(address));
@@ -122,7 +155,14 @@ export default function LoginPage({ onLoginSuccess, onSwitchToSignup }) {
     }
   };
 
-  const handleGoogle = () => { window.location.href = `${API}/api/auth/google`; };
+  // ── Google login: show our overlay FIRST, then redirect ──────────────────
+  const handleGoogle = () => {
+    setGoogleLoading(true);
+    // Small delay lets React paint the overlay before browser navigates away
+    setTimeout(() => {
+      window.location.href = `${API}/api/auth/google`;
+    }, 300);
+  };
 
   const handleMouseMove = e => {
     const card = cardRef.current;
@@ -147,6 +187,9 @@ export default function LoginPage({ onLoginSuccess, onSwitchToSignup }) {
     <>
       <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400;1,600&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
 
+      {/* ── Google loading overlay ── */}
+      {googleLoading && <GoogleLoadingOverlay />}
+
       <div ref={wrapRef} className="lp-root">
         <img className="lp-bg" src="https://i.postimg.cc/6p7nY0n8/Background.png" alt="" aria-hidden />
 
@@ -154,7 +197,7 @@ export default function LoginPage({ onLoginSuccess, onSwitchToSignup }) {
           <div key={i} className="lp-dot" style={{ top: d.top, left: d.left, width: d.size, height: d.size, background: d.color, animationDelay: d.delay }} />
         ))}
 
-        {/* ── Left panel (unchanged) ────────────────────────────────────── */}
+        {/* ── Left panel ── */}
         <div className="lp-panel">
           <div className="lp-panel-inner">
             <div className="lp-logo-in lp-stag">
@@ -184,7 +227,7 @@ export default function LoginPage({ onLoginSuccess, onSwitchToSignup }) {
           <div className="lp-panel-rule" />
         </div>
 
-        {/* ── Right card ───────────────────────────────────────────────── */}
+        {/* ── Right card ── */}
         <div className="lp-card-wrap">
           <div ref={cardRef} className="lp-card" onMouseMove={handleMouseMove} onMouseLeave={handleMouseLeave}>
             <div className="lp-card-header lp-stag">
@@ -197,9 +240,18 @@ export default function LoginPage({ onLoginSuccess, onSwitchToSignup }) {
             </div>
 
             <div className="lp-social-row lp-stag">
-              <button className="lp-social-btn" type="button" onClick={handleGoogle}>
-                <FontAwesomeIcon icon={faGoogle} />
-                <span>Continue with Google</span>
+              <button
+                className={`lp-social-btn${googleLoading ? " lp-social-btn--loading" : ""}`}
+                type="button"
+                onClick={handleGoogle}
+                disabled={googleLoading}
+              >
+                {googleLoading ? (
+                  <span className="lp-spinner" style={{ borderColor: "rgba(196,81,10,0.3)", borderTopColor: "#C4510A" }} />
+                ) : (
+                  <FontAwesomeIcon icon={faGoogle} />
+                )}
+                <span>{googleLoading ? "Connecting…" : "Continue with Google"}</span>
               </button>
             </div>
 
@@ -210,7 +262,6 @@ export default function LoginPage({ onLoginSuccess, onSwitchToSignup }) {
             </div>
 
             <form onSubmit={handleSubmit} autoComplete="off" noValidate>
-              {/* Email */}
               <div className={`lp-field lp-stag${focused === "email" ? " focused" : ""}${email ? " filled" : ""}`}>
                 <label className="lp-label" htmlFor="lp-email">Email Address <span className="lp-req">*</span></label>
                 <div className="lp-input-wrap">
@@ -225,7 +276,6 @@ export default function LoginPage({ onLoginSuccess, onSwitchToSignup }) {
                 </div>
               </div>
 
-              {/* Password */}
               <div className={`lp-field lp-stag${focused === "password" ? " focused" : ""}${password ? " filled" : ""}`}>
                 <label className="lp-label" htmlFor="lp-password">Password <span className="lp-req">*</span></label>
                 <div className="lp-input-wrap">
@@ -243,13 +293,7 @@ export default function LoginPage({ onLoginSuccess, onSwitchToSignup }) {
                 </div>
               </div>
 
-              {/* Address */}
-              <AddressFields
-                address={address}
-                setAddress={setAddress}
-                focusedField={focused}
-                setFocused={setFocused}
-              />
+              <AddressFields address={address} setAddress={setAddress} focusedField={focused} setFocused={setFocused} />
 
               {error && <p className="lp-error lp-stag">{error}</p>}
 
@@ -305,7 +349,8 @@ export default function LoginPage({ onLoginSuccess, onSwitchToSignup }) {
         .lp-card-sub { font-size:13px; color:#7a716b; line-height:1.6; }
         .lp-social-row { margin-bottom:16px; }
         .lp-social-btn { width:100%; display:flex; align-items:center; justify-content:center; gap:10px; background:rgba(255,255,255,0.8); border:1.5px solid rgba(196,81,10,0.2); border-radius:12px; padding:12px 16px; font-size:13px; font-weight:600; color:#1A1A1A; cursor:pointer; font-family:'Plus Jakarta Sans',sans-serif; transition:all 0.25s; backdrop-filter:blur(8px); }
-        .lp-social-btn:hover { border-color:#C4510A; box-shadow:0 4px 16px rgba(196,81,10,0.15); transform:translateY(-1px); }
+        .lp-social-btn:hover:not(:disabled) { border-color:#C4510A; box-shadow:0 4px 16px rgba(196,81,10,0.15); transform:translateY(-1px); }
+        .lp-social-btn--loading { opacity:0.75; cursor:not-allowed; }
         .lp-or-row { display:flex; align-items:center; gap:12px; margin-bottom:20px; }
         .lp-or-line { flex:1; height:1px; background:rgba(196,81,10,0.15); }
         .lp-or-text { font-size:11px; color:#a89890; font-weight:500; letter-spacing:0.5px; white-space:nowrap; }
@@ -333,7 +378,6 @@ export default function LoginPage({ onLoginSuccess, onSwitchToSignup }) {
         .lp-addr-icon { color:#C4510A; font-size:12px; }
         .lp-addr-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
         .lp-field.lp-full { grid-column:1 / -1; }
-
         .lp-error { font-size:12px; color:#d94f0a; background:rgba(217,79,10,0.07); border:1px solid rgba(217,79,10,0.2); border-radius:8px; padding:8px 14px; margin-bottom:16px; }
         .lp-submit { width:100%; border:none; cursor:pointer; background:linear-gradient(135deg,#C4510A,#E8763A); color:#fff; font-family:'Plus Jakarta Sans',sans-serif; font-size:14px; font-weight:700; letter-spacing:0.5px; padding:14px 28px; border-radius:14px; display:flex; align-items:center; justify-content:center; gap:10px; box-shadow:0 8px 24px rgba(196,81,10,0.3); transition:transform 0.2s,box-shadow 0.2s,opacity 0.2s; margin-bottom:20px; min-height:50px; }
         .lp-submit:hover:not(:disabled) { transform:translateY(-2px); box-shadow:0 14px 32px rgba(196,81,10,0.4); }
@@ -346,8 +390,59 @@ export default function LoginPage({ onLoginSuccess, onSwitchToSignup }) {
         .lp-switch-link { color:#C4510A; font-weight:700; text-decoration:none; }
         .lp-switch-link:hover { opacity:0.75; }
 
+        /* ── Google Loading Overlay ── */
+        .gl-overlay {
+          position: fixed; inset: 0; z-index: 9999;
+          background: rgba(13, 8, 2, 0.96);
+          backdrop-filter: blur(20px);
+          -webkit-backdrop-filter: blur(20px);
+          display: flex; align-items: center; justify-content: center;
+          animation: glFadeIn 0.25s ease;
+        }
+        @keyframes glFadeIn { from{opacity:0} to{opacity:1} }
+        .gl-card {
+          display: flex; flex-direction: column; align-items: center; gap: 16px;
+          padding: 48px 56px;
+          background: rgba(255,255,255,0.04);
+          border: 1px solid rgba(196,81,10,0.25);
+          border-radius: 28px;
+          backdrop-filter: blur(24px);
+          box-shadow: 0 32px 80px rgba(0,0,0,0.5);
+          animation: glSlideUp 0.3s ease;
+        }
+        @keyframes glSlideUp { from{transform:translateY(24px);opacity:0} to{transform:translateY(0);opacity:1} }
+        .gl-logo { height: 64px; width: auto; object-fit: contain; }
+        .gl-brand { display: flex; gap: 8px; align-items: baseline; }
+        .gl-noir { font-family: 'Cormorant Garamond', serif; font-size: 28px; font-weight: 900; color: #F5F5F5; letter-spacing: 0.06em; }
+        .gl-kitchen { font-family: 'Cormorant Garamond', serif; font-size: 28px; font-weight: 900; color: #E65C00; letter-spacing: 0.06em; }
+        .gl-spinner-wrap { position: relative; width: 56px; height: 56px; margin: 8px 0; }
+        .gl-ring {
+          position: absolute; inset: 0; border-radius: 50%;
+          border: 2.5px solid transparent;
+          border-top-color: #E65C00;
+          animation: glSpin 0.9s linear infinite;
+        }
+        .gl-ring-2 {
+          inset: 8px;
+          border-top-color: rgba(230,92,0,0.4);
+          animation-duration: 1.4s;
+          animation-direction: reverse;
+        }
+        @keyframes glSpin { to { transform: rotate(360deg); } }
+        .gl-title { font-family: 'Cormorant Garamond', serif; font-size: 22px; font-weight: 600; color: #F5F5F5; }
+        .gl-sub { font-family: 'Plus Jakarta Sans', sans-serif; font-size: 13px; color: rgba(245,245,245,0.5); }
+        .gl-dots { display: flex; gap: 6px; margin-top: 4px; }
+        .gl-dots span {
+          width: 6px; height: 6px; border-radius: 50%;
+          background: #E65C00; opacity: 0.3;
+          animation: glDot 1.2s ease-in-out infinite;
+        }
+        .gl-dots span:nth-child(2) { animation-delay: 0.2s; }
+        .gl-dots span:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes glDot { 0%,100%{opacity:0.3;transform:scale(1)} 50%{opacity:1;transform:scale(1.3)} }
+
         @media(max-width:768px) { .lp-panel{display:none;} .lp-card-wrap{padding:24px 20px;} .lp-card{padding:32px 28px 28px;border-radius:24px;} }
-        @media(max-width:480px) { .lp-card-wrap{padding:16px 14px;} .lp-card{padding:28px 20px 24px;border-radius:20px;} .lp-addr-grid{grid-template-columns:1fr;} .lp-field.lp-full{grid-column:auto;} }
+        @media(max-width:480px) { .lp-card-wrap{padding:16px 14px;} .lp-card{padding:28px 20px 24px;border-radius:20px;} .lp-addr-grid{grid-template-columns:1fr;} .lp-field.lp-full{grid-column:auto;} .gl-card{padding:40px 32px;} }
       `}</style>
     </>
   );
