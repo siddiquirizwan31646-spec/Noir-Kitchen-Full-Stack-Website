@@ -43,14 +43,20 @@ const orderSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 // ── Sync GeoJSON point before save ────────────────────────────────────────
+// models/Order.js  — replace your pre('save') hook with this:
+
 orderSchema.pre('save', function (next) {
-    if (this.latitude != null && this.longitude != null) {
-        this.location = {
-            type: 'Point',
-            coordinates: [this.longitude, this.latitude],
-        };
+    try {
+        if (this.latitude != null && this.longitude != null) {
+            this.location = {
+                type: 'Point',
+                coordinates: [this.longitude, this.latitude],
+            };
+        }
+        if (typeof next === 'function') next();
+    } catch (err) {
+        if (typeof next === 'function') next(err);
     }
-    next();
 });
 
 // ── Also sync on Order.create() which uses insertMany internally ──────────
