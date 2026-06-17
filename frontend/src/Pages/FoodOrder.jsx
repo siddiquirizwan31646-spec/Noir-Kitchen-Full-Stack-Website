@@ -5,6 +5,8 @@ import Navbar from "../component/ui/Navbar";
 const FONT_LINK =
     "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400;1,600&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap";
 
+const FA_LINK =
+    "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css";    
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -65,7 +67,38 @@ export default function FoodOrder({ user, onLogout, cart }) {
     const [added, setAdded] = useState(false);
     const [suggested, setSuggested] = useState([]);
     const [activeNav, setActiveNav] = useState("Menu");
+    const [autoAddress, setAutoAddress] = useState(null);
+const [locating, setLocating] = useState(false);
+const [locError, setLocError] = useState("");
 
+const useMyLocation = () => {
+    if (!navigator.geolocation) {
+        setLocError("Geolocation isn't supported by your browser.");
+        return;
+    }
+    setLocating(true);
+    setLocError("");
+    navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+            const { latitude, longitude } = pos.coords;
+            try {
+                const res = await fetch(
+                    `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
+                );
+                const data = await res.json();
+                setAutoAddress(data?.display_name || `${latitude}, ${longitude}`);
+            } catch {
+                setAutoAddress(`${latitude}, ${longitude}`);
+            } finally {
+                setLocating(false);
+            }
+        },
+        () => {
+            setLocError("Couldn't get your location — check device permissions.");
+            setLocating(false);
+        }
+    );
+};
     // ── Logout fix ─────────────────────────────────────────────────────────
     const handleLogout = () => {
         localStorage.removeItem("token");
@@ -219,6 +252,7 @@ export default function FoodOrder({ user, onLogout, cart }) {
     return (
         <>
             <link href={FONT_LINK} rel="stylesheet" />
+            <link href={FA_LINK} rel="stylesheet" />
             <div className="fo-root">
                 <Navbar
                     user={user}
@@ -230,13 +264,22 @@ export default function FoodOrder({ user, onLogout, cart }) {
 
                 {/* ── ADDRESS NOTICE ── */}
                 {isPlaceholder && (
-                    <div className="fo-addr-banner">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
-                        </svg>
-                        No delivery address saved. You'll be asked to add one at checkout.
-                    </div>
-                )}
+    <div className="fo-addr-banner">
+        <i className="fa-solid fa-circle-info" />
+        {autoAddress ? (
+            <span>Delivering to: <strong>{autoAddress}</strong></span>
+        ) : (
+            <>
+                <span>No delivery address saved. You'll be asked to add one at checkout.</span>
+                <button onClick={useMyLocation} className="fo-locate-btn" disabled={locating}>
+                    <i className="fa-solid fa-location-crosshairs" />
+                    {locating ? "Locating…" : "Use My Location"}
+                </button>
+            </>
+        )}
+        {locError && <span className="fo-loc-error">{locError}</span>}
+    </div>
+)}
 
                 {/* ══════════════════════════════════════════
             PART 1 — HERO: image + order panel
@@ -248,8 +291,9 @@ export default function FoodOrder({ user, onLogout, cart }) {
                             <img src={imgs[activeImg]} alt={displayItem.name} className="fo-img-main" />
                             {displayItem.featured && <div className="fo-featured-badge">✦ Featured</div>}
                             <div className={`fo-avail-badge ${displayItem.available ? "fo-avail-yes" : "fo-avail-no"}`}>
-                                {displayItem.available ? "● Available" : "● Out of Stock"}
-                            </div>
+    <i className="fa-solid fa-circle" style={{ fontSize: 6, marginRight: 5 }} />
+    {displayItem.available ? "Available" : "Out of Stock"}
+</div>
                             {/* Expand icon */}
                             <button className="fo-expand-btn" onClick={() => window.open(imgs[activeImg], "_blank")}>
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -430,12 +474,12 @@ export default function FoodOrder({ user, onLogout, cart }) {
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: 8 }}>
                                     <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z" /><line x1="3" y1="6" x2="21" y2="6" /><path d="M16 10a4 4 0 01-8 0" />
                                 </svg>
-                                {added ? "✓ Added to Cart" : "Add to Cart"}
+                                {added ? (<><i className="fa-solid fa-check" style={{ marginRight: 6 }} /> Added to Cart</>) : "Add to Cart"}
                             </button>
                             <button
                                 className="fo-btn-secondary"
                                 onClick={() => navigate(
-                                    `/order/${encodeURIComponent(displayItem.name)}/${displayItem.veg ? "veg" : "non-veg"}/${encodeURIComponent(variants.length ? variants[selVariant].price : displayItem.price)}/${encodeURIComponent(user?.name || "Guest")}/${encodeURIComponent(user?.username || "guest")}/${encodeURIComponent(decodeURIComponent(addressStr || "ADDR-none"))}`,
+                                    `/order/${encodeURIComponent(displayItem.name)}/${displayItem.veg ? "veg" : "non-veg"}/${encodeURIComponent(variants.length ? variants[selVariant].price : displayItem.price)}/${encodeURIComponent(user?.name || "Guest")}/${encodeURIComponent(user?.username || "guest")}/${encodeURIComponent(autoAddress || decodeURIComponent(addressStr || "ADDR-none"))}`,
                                     {
                                         state: {
                                             qty,
@@ -560,7 +604,7 @@ export default function FoodOrder({ user, onLogout, cart }) {
                         <div className="fo-suggested-block">
                             <p className="fo-eyebrow" style={{ marginBottom: 16 }}>
                                 You May Also Like{" "}
-                                <span style={{ color: "#D86A1C", marginLeft: 6 }}>✦</span>
+                                <i className="fa-solid fa-star" style={{ color: "#D86A1C", marginLeft: 6, fontSize: 10 }} />
                             </p>
                             <div className="fo-sug-scroll-wrap">
                                 <div className="fo-sug-grid">
