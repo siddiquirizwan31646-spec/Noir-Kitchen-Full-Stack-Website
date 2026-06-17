@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import Navbar from "../component/ui/Navbar";
 
@@ -8,7 +8,10 @@ const FONT_LINK =
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
 const GST_RATE = 0.18;
 const ESTIMATED_DELIVERY = "30–45 minutes";
+const LOC_KEY  = "nk_delivery_coords";
+const ADDR_KEY = "nk_delivery_address";
 
+// ── Helpers ────────────────────────────────────────────────────────────────
 function ReadonlyField({ label, value, icon }) {
     return (
         <div className="off-field-wrap">
@@ -45,22 +48,105 @@ function InputField({ label, name, value, onChange, placeholder, required, type 
     );
 }
 
+// ── Location Section ───────────────────────────────────────────────────────
+function LocationSection({ coords, resolvedAddress, locating, locError, onRequestLocation, onReset }) {
+    // Permission denied state
+    if (locError) {
+        return (
+            <div className="off-loc-error-card">
+                <div className="off-loc-err-icon">⚠️</div>
+                <p className="off-loc-err-title">Location Access Denied</p>
+                <p className="off-loc-err-msg">{locError}</p>
+                <button className="off-loc-btn" onClick={onRequestLocation}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+                    Try Again
+                </button>
+            </div>
+        );
+    }
+
+    // Locating spinner
+    if (locating) {
+        return (
+            <div className="off-loc-detecting">
+                <div className="off-loc-pulse" />
+                <div>
+                    <p className="off-loc-det-title">Detecting your location…</p>
+                    <p className="off-loc-det-sub">Please allow location access in your browser</p>
+                </div>
+            </div>
+        );
+    }
+
+    // No permission yet
+    if (!coords) {
+        return (
+            <div className="off-loc-prompt">
+                <div className="off-loc-prompt-icon">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#D86A1C" strokeWidth="1.5">
+                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/>
+                        <circle cx="12" cy="10" r="3"/>
+                    </svg>
+                </div>
+                <h4 className="off-loc-prompt-title">Enable Location for Delivery</h4>
+                <p className="off-loc-prompt-sub">We need your GPS location to deliver your order accurately. Your coordinates are saved securely.</p>
+                <button className="off-loc-btn off-loc-btn-main" onClick={onRequestLocation}>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+                    Use My Current Location
+                </button>
+            </div>
+        );
+    }
+
+    // Got coords — show map
+    return (
+        <div className="off-loc-map-wrap">
+            <div className="off-loc-map-frame">
+                <iframe
+                    title="Delivery location"
+                    src={`https://maps.google.com/maps?q=${coords.lat},${coords.lng}&z=16&output=embed`}
+                    loading="lazy"
+                    referrerPolicy="no-referrer-when-downgrade"
+                />
+                <div className="off-loc-map-badge">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="#D86A1C"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+                    GPS Located
+                </div>
+            </div>
+            <div className="off-loc-addr-row">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#D86A1C" strokeWidth="2" style={{flexShrink:0,marginTop:2}}>
+                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/>
+                </svg>
+                <span className="off-loc-addr-text">{resolvedAddress || `${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)}`}</span>
+                <button className="off-loc-update-btn" onClick={onReset} title="Update location">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                    </svg>
+                    Update
+                </button>
+            </div>
+            <p className="off-loc-coords-pill">
+                {coords.lat.toFixed(6)}, {coords.lng.toFixed(6)}
+            </p>
+        </div>
+    );
+}
+
+// ── Main Component ─────────────────────────────────────────────────────────
 export default function OrderFoodForm({ user: propUser, onLogout, cart }) {
     const { foodName, vegType, price, customerName, username, addressStr } = useParams();
     const navigate = useNavigate();
     const location = useLocation();
     const orderState = location.state || {};
 
-    const qty              = orderState.qty || 1;
-    const note             = orderState.note || "";
-    const selectedVariant  = orderState.selectedVariant || null;
-    const selectedAddons   = orderState.selectedAddons || [];
-    const itemImg          = orderState.itemImg || "";
-    const user             = propUser || { name: customerName || "Guest", email: "" };
-    const decodedFood      = decodeURIComponent(foodName || "");
-    const decodedPrice     = decodeURIComponent(price || "0");
-    const decodedAddress   = decodeURIComponent(addressStr || "");
-    const isPlaceholder    = decodedAddress.startsWith("ADDR-");
+    const qty             = orderState.qty || 1;
+    const note            = orderState.note || "";
+    const selectedVariant = orderState.selectedVariant || null;
+    const selectedAddons  = orderState.selectedAddons || [];
+    const itemImg         = orderState.itemImg || "";
+    const user            = propUser || { name: customerName || "Guest", email: "" };
+    const decodedFood     = decodeURIComponent(foodName || "");
+    const decodedPrice    = decodeURIComponent(price || "0");
 
     const [item, setItem]             = useState(null);
     const [loading, setLoading]       = useState(true);
@@ -70,24 +156,89 @@ export default function OrderFoodForm({ user: propUser, onLogout, cart }) {
     const [errors, setErrors]         = useState({});
     const [activeNav, setActiveNav]   = useState("Menu");
 
+    // ── GPS state ──────────────────────────────────────────────────────────
+    const [coords, setCoords] = useState(() => {
+        // 1. from router state
+        if (orderState.latitude && orderState.longitude)
+            return { lat: orderState.latitude, lng: orderState.longitude };
+        // 2. from URL param  "lat,lng"
+        const raw = decodeURIComponent(addressStr || "");
+        const [la, lo] = raw.split(",").map(Number);
+        if (!isNaN(la) && !isNaN(lo) && la !== 0) return { lat: la, lng: lo };
+        // 3. localStorage cache
+        try {
+            const saved = JSON.parse(localStorage.getItem(LOC_KEY) || "null");
+            if (saved?.lat) return saved;
+        } catch {}
+        return null;
+    });
+
+    const [resolvedAddress, setResolvedAddress] = useState(
+        () => orderState.deliveryAddress || localStorage.getItem(ADDR_KEY) || ""
+    );
+    const [locating, setLocating] = useState(false);
+    const [locError, setLocError] = useState("");
+
+    // ── Form fields (only name + mobile now; address = GPS) ───────────────
     const [form, setForm] = useState({
         fullName: user?.name || "",
         mobile:   user?.phone || "",
-        houseNo: "", areaName: "", areaNo: "", city: "", pinCode: "",
     });
 
+    // ── Auto-request location on mount if not already obtained ────────────
     useEffect(() => {
-        if (user?.address && !isPlaceholder) {
-            setForm(f => ({
-                ...f,
-                houseNo:  user.address.houseNo  || "",
-                areaName: user.address.areaName || "",
-                areaNo:   user.address.areaNo   || "",
-                city:     user.address.city     || "",
-                pinCode:  user.address.pinCode  || "",
-            }));
+        if (!coords) requestLocation();
+    }, []);
+
+    const reverseGeocode = useCallback(async (lat, lng) => {
+        try {
+            const res  = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
+            const data = await res.json();
+            return data?.display_name || `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+        } catch {
+            return `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
         }
-    }, [user]);
+    }, []);
+
+    const requestLocation = useCallback(() => {
+        if (!navigator.geolocation) {
+            setLocError("Geolocation is not supported by your browser.");
+            return;
+        }
+        setLocating(true);
+        setLocError("");
+        navigator.geolocation.getCurrentPosition(
+            async (pos) => {
+                const lat = pos.coords.latitude;
+                const lng = pos.coords.longitude;
+                const c   = { lat, lng };
+                setCoords(c);
+                localStorage.setItem(LOC_KEY, JSON.stringify(c));
+                const addr = await reverseGeocode(lat, lng);
+                setResolvedAddress(addr);
+                localStorage.setItem(ADDR_KEY, addr);
+                setLocating(false);
+            },
+            (err) => {
+                setLocating(false);
+                if (err.code === 1)
+                    setLocError("Location permission denied. Please enable it in your browser settings and try again.");
+                else if (err.code === 2)
+                    setLocError("Location unavailable right now. Please try again.");
+                else
+                    setLocError("Location request timed out. Please try again.");
+            },
+            { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+        );
+    }, [reverseGeocode]);
+
+    const resetLocation = () => {
+        setCoords(null);
+        setResolvedAddress("");
+        localStorage.removeItem(LOC_KEY);
+        localStorage.removeItem(ADDR_KEY);
+        requestLocation();
+    };
 
     useEffect(() => {
         async function fetchItem() {
@@ -106,15 +257,17 @@ export default function OrderFoodForm({ user: propUser, onLogout, cart }) {
         fetchItem();
     }, [decodedFood]);
 
-    const now = new Date();
+    const now           = new Date();
     const orderDateTime = now.toLocaleString("en-IN", {
         day: "2-digit", month: "short", year: "numeric",
         hour: "2-digit", minute: "2-digit", hour12: true,
     });
+
     const rawPrice = (() => {
         const src = selectedVariant?.price || decodedPrice;
         return parseInt(String(src).replace(/[^\d]/g, "")) || 0;
     })();
+
     const addonTotal     = selectedAddons.reduce((s, a) => s + (parseInt(String(a.price || "0").replace(/[^\d]/g, "")) || 0), 0);
     const gstAmount      = Math.round((rawPrice + addonTotal) * qty * GST_RATE);
     const totalAmount    = (rawPrice + addonTotal) * qty + gstAmount;
@@ -133,24 +286,22 @@ export default function OrderFoodForm({ user: propUser, onLogout, cart }) {
         if (!form.fullName.trim()) e.fullName = "Full name is required";
         if (!form.mobile.trim())   e.mobile   = "Mobile number is required";
         else if (!/^[6-9]\d{9}$/.test(form.mobile.trim())) e.mobile = "Enter a valid 10-digit Indian mobile number";
-        if (!form.houseNo.trim())  e.houseNo  = "House / Flat No. is required";
-        if (!form.areaName.trim()) e.areaName = "Area / Apartment Name is required";
-        if (!form.areaNo.trim())   e.areaNo   = "Area / Apartment No. is required";
-        if (!form.city.trim())     e.city     = "City is required";
-        if (!form.pinCode.trim())  e.pinCode  = "PIN Code is required";
-        else if (!/^\d{6}$/.test(form.pinCode.trim())) e.pinCode = "Enter a valid 6-digit PIN code";
+        if (!coords)               e.location = "Please enable location access to place your order";
         return e;
     };
 
     const handleSubmit = async e => {
         e.preventDefault();
         const errs = validate();
-        if (Object.keys(errs).length) { setErrors(errs); return; }
+        if (Object.keys(errs).length) {
+            setErrors(errs);
+            if (errs.location) requestLocation();
+            return;
+        }
 
         setSubmitting(true);
         try {
             const token = localStorage.getItem("token");
-            const deliveryAddress = [form.houseNo, form.areaName, form.areaNo, form.city, form.pinCode].join(", ");
 
             const payload = {
                 email:               user?.email || "",
@@ -171,12 +322,9 @@ export default function OrderFoodForm({ user: propUser, onLogout, cart }) {
                 customerId:          user?._id || user?.id || null,
                 fullName:            form.fullName.trim(),
                 mobile:              form.mobile.trim(),
-                deliveryAddress,
-                houseNo:             form.houseNo.trim(),
-                areaName:            form.areaName.trim(),
-                areaNo:              form.areaNo.trim(),
-                city:                form.city.trim(),
-                pinCode:             form.pinCode.trim(),
+                deliveryAddress:     resolvedAddress,
+                latitude:            coords.lat,
+                longitude:           coords.lng,
                 orderStatus:         "Placed",
                 deliveryPartner:     null,
             };
@@ -207,6 +355,7 @@ export default function OrderFoodForm({ user: propUser, onLogout, cart }) {
     if (loading) return (
         <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#F8F1EA" }}>
             <div className="off-spinner" />
+            <style>{STYLES}</style>
         </div>
     );
 
@@ -230,7 +379,7 @@ export default function OrderFoodForm({ user: propUser, onLogout, cart }) {
                             <div className="off-suc-row"><span>Item</span><strong>{decodedFood}</strong></div>
                             <div className="off-suc-row"><span>Total Paid</span><strong>₹{finalAmount.toLocaleString("en-IN")}</strong></div>
                             <div className="off-suc-row"><span>Payment</span><strong>Cash on Delivery</strong></div>
-                            <div className="off-suc-row"><span>Delivery to</span><strong>{form.city}</strong></div>
+                            <div className="off-suc-row"><span>Delivery to</span><strong style={{maxWidth:220,textAlign:"right",fontSize:12}}>{resolvedAddress.split(",").slice(0,3).join(", ")}</strong></div>
                             <div className="off-suc-row"><span>Estimated Time</span><strong>{ESTIMATED_DELIVERY}</strong></div>
                             <div className="off-suc-row"><span>Status</span><strong className="off-status-placed">● Placed</strong></div>
                         </div>
@@ -255,12 +404,14 @@ export default function OrderFoodForm({ user: propUser, onLogout, cart }) {
                     <div className="off-hero-inner">
                         <p className="off-eyebrow">Noir Kitchen <span className="off-orn">✦</span> Place Your Order</p>
                         <h1 className="off-hero-h1">Almost There — <em className="off-accent">Confirm Your Order</em></h1>
-                        <p className="off-hero-sub">Review your order details and fill in your delivery information below.</p>
+                        <p className="off-hero-sub">Review your order details and confirm your GPS delivery location below.</p>
                     </div>
                 </div>
 
                 <form className="off-form-wrap" onSubmit={handleSubmit} noValidate>
                     <div className="off-layout">
+
+                        {/* ── LEFT ── */}
                         <div className="off-left">
                             <div className="off-item-card">
                                 {(itemImg || item?.img) && (
@@ -316,6 +467,7 @@ export default function OrderFoodForm({ user: propUser, onLogout, cart }) {
                             </div>
                         </div>
 
+                        {/* ── RIGHT ── */}
                         <div className="off-right">
                             <div className="off-section">
                                 <div className="off-section-hd">
@@ -331,35 +483,74 @@ export default function OrderFoodForm({ user: propUser, onLogout, cart }) {
                                 </div>
                             </div>
 
+                            {/* ── GPS / MAP SECTION ── */}
                             <div className="off-section">
                                 <div className="off-section-hd">
                                     <span className="off-section-icon">📍</span>
                                     <div>
-                                        <h3 className="off-section-title">Delivery Address</h3>
-                                        <p className="off-section-sub">Where should we deliver your order?</p>
+                                        <h3 className="off-section-title">Delivery Location</h3>
+                                        <p className="off-section-sub">
+                                            {coords
+                                                ? "Your GPS location is confirmed for delivery"
+                                                : "We need your live location to deliver accurately"}
+                                        </p>
                                     </div>
                                 </div>
-                                <div className="off-fields-col">
-                                    <InputField label="House / Flat No." name="houseNo" value={form.houseNo} onChange={handleChange} placeholder="e.g. B-204, Tower 3" required error={errors.houseNo} />
-                                    <InputField label="Area / Apartment Name" name="areaName" value={form.areaName} onChange={handleChange} placeholder="e.g. Green Valley Apartments" required error={errors.areaName} />
-                                    <InputField label="Area / Apartment No." name="areaNo" value={form.areaNo} onChange={handleChange} placeholder="e.g. Sector 14" required error={errors.areaNo} />
-                                    <div className="off-fields-row-2">
-                                        <InputField label="City" name="city" value={form.city} onChange={handleChange} placeholder="e.g. Jaipur" required error={errors.city} />
-                                        <InputField label="PIN Code" name="pinCode" value={form.pinCode} onChange={handleChange} placeholder="6-digit PIN" required error={errors.pinCode} />
-                                    </div>
-                                </div>
+
+                                <LocationSection
+                                    coords={coords}
+                                    resolvedAddress={resolvedAddress}
+                                    locating={locating}
+                                    locError={locError}
+                                    onRequestLocation={requestLocation}
+                                    onReset={resetLocation}
+                                />
+
+                                {errors.location && (
+                                    <p className="off-err-msg" style={{marginTop:10}}>{errors.location}</p>
+                                )}
                             </div>
 
                             <div className="off-sticky-summary">
-                                <div className="off-summary-item"><span className="off-summary-label">Item</span><span className="off-summary-val">{decodedFood}</span></div>
-                                <div className="off-summary-item"><span className="off-summary-label">Total</span><span className="off-summary-total">₹{finalAmount.toLocaleString("en-IN")}</span></div>
-                                <div className="off-summary-item"><span className="off-summary-label">Payment</span><span className="off-summary-val">Cash on Delivery</span></div>
-                                <button type="submit" className={`off-btn-primary off-submit-btn ${submitting ? "off-btn-loading" : ""}`} disabled={submitting}>
+                                <div className="off-summary-item">
+                                    <span className="off-summary-label">Item</span>
+                                    <span className="off-summary-val">{decodedFood}</span>
+                                </div>
+                                <div className="off-summary-item">
+                                    <span className="off-summary-label">Total</span>
+                                    <span className="off-summary-total">₹{finalAmount.toLocaleString("en-IN")}</span>
+                                </div>
+                                <div className="off-summary-item">
+                                    <span className="off-summary-label">Payment</span>
+                                    <span className="off-summary-val">Cash on Delivery</span>
+                                </div>
+
+                                {/* Location status pill in summary */}
+                                <div className={`off-loc-status-pill ${coords ? "off-loc-ok" : "off-loc-pending"}`}>
+                                    {coords ? (
+                                        <><span className="off-loc-dot" />GPS Location Confirmed</>
+                                    ) : (
+                                        <><span className="off-loc-dot" />Waiting for Location…</>
+                                    )}
+                                </div>
+
+                                <button
+                                    type="submit"
+                                    className={`off-btn-primary off-submit-btn ${submitting ? "off-btn-loading" : ""} ${!coords ? "off-btn-disabled-loc" : ""}`}
+                                    disabled={submitting || !coords}
+                                >
                                     {submitting ? (
                                         <><span className="off-btn-spinner" /> Placing Order…</>
+                                    ) : !coords ? (
+                                        <>
+                                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{marginRight:8}}>
+                                                <circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
+                                            </svg>
+                                            Enable Location to Continue
+                                        </>
                                     ) : (
                                         <>
-                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: 8 }}>
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{marginRight:8}}>
                                                 <path d="M5 12h14M12 5l7 7-7 7" />
                                             </svg>
                                             Place Order
@@ -383,6 +574,7 @@ const STYLES = `
 .off-spinner { width: 38px; height: 38px; border-radius: 50%; border: 3px solid rgba(216,106,28,0.15); border-top-color: #D86A1C; animation: offSpin 0.8s linear infinite; }
 @keyframes offSpin { to { transform: rotate(360deg); } }
 
+/* ── HERO ── */
 .off-hero { background: linear-gradient(135deg,#2B1600,#4A2500); padding: 52px 48px 48px; text-align: center; }
 .off-hero-inner { max-width: 680px; margin: 0 auto; }
 .off-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: 2.5px; text-transform: uppercase; color: #F0924A; display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 16px; }
@@ -391,9 +583,11 @@ const STYLES = `
 .off-accent { font-style: italic; color: #F0924A; }
 .off-hero-sub { font-size: 14px; color: rgba(248,241,234,0.6); line-height: 1.7; }
 
+/* ── FORM ── */
 .off-form-wrap { max-width: 1200px; margin: 0 auto; padding: 40px 40px 80px; }
 .off-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; align-items: start; }
 
+/* ── ITEM CARD ── */
 .off-item-card { display: flex; align-items: center; gap: 16px; background: #fff; border-radius: 16px; padding: 16px 20px; border: 1px solid rgba(216,106,28,0.12); box-shadow: 0 4px 16px rgba(0,0,0,0.06); margin-bottom: 20px; }
 .off-item-img { width: 72px; height: 72px; border-radius: 12px; object-fit: cover; flex-shrink: 0; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
 .off-item-info { display: flex; align-items: center; gap: 12px; flex: 1; }
@@ -404,12 +598,14 @@ const STYLES = `
 .off-veg-circle { width: 9px; height: 9px; border-radius: 50%; }
 .off-veg .off-veg-circle { background: #4CAF50; } .off-nonveg .off-veg-circle { background: #D32F2F; }
 
+/* ── SECTION ── */
 .off-section { background: #fff; border-radius: 20px; border: 1px solid rgba(216,106,28,0.1); box-shadow: 0 4px 20px rgba(0,0,0,0.06); padding: 24px; margin-bottom: 20px; }
 .off-section-hd { display: flex; align-items: flex-start; gap: 14px; padding-bottom: 18px; margin-bottom: 20px; border-bottom: 1px solid rgba(216,106,28,0.1); }
 .off-section-icon { font-size: 22px; line-height: 1; flex-shrink: 0; margin-top: 2px; }
 .off-section-title { font-family: 'Cormorant Garamond', serif; font-size: 20px; font-weight: 600; color: #1A1208; margin-bottom: 3px; }
 .off-section-sub { font-size: 12px; color: #9A8570; }
 
+/* ── FIELDS ── */
 .off-field-wrap { display: flex; flex-direction: column; gap: 6px; }
 .off-label { font-size: 10px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: #9A8570; }
 .off-req { color: #D86A1C; margin-left: 3px; }
@@ -417,11 +613,9 @@ const STYLES = `
 .off-readonly-icon { font-size: 14px; flex-shrink: 0; }
 .off-readonly-val { font-size: 13px; color: #1A1208; font-weight: 500; flex: 1; }
 .off-lock { margin-left: auto; color: #C4B09A; flex-shrink: 0; }
-
 .off-fields-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .off-fields-col { display: flex; flex-direction: column; gap: 14px; }
 .off-fields-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-
 .off-input-wrap { display: flex; align-items: center; background: #fff; border: 1.5px solid rgba(216,106,28,0.2); border-radius: 12px; padding: 0 14px; transition: border-color 0.2s, box-shadow 0.2s; }
 .off-input-focus { border-color: #D86A1C; box-shadow: 0 0 0 3px rgba(216,106,28,0.1); }
 .off-input-err { border-color: #D32F2F; }
@@ -431,27 +625,142 @@ const STYLES = `
 .off-input:disabled { color: #6B5B45; }
 .off-err-msg { font-size: 11px; color: #D32F2F; font-weight: 500; }
 
+/* ── PRICE ── */
 .off-price-breakdown { display: flex; flex-direction: column; gap: 10px; }
 .off-price-row { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: #6B5B45; }
 .off-price-discount { color: #2E7D32; }
 .off-price-total { font-family: 'Cormorant Garamond', serif; font-size: 20px; font-weight: 600; color: #1A1208; }
 .off-price-divider { height: 1px; background: linear-gradient(90deg, transparent, rgba(216,106,28,0.2), transparent); margin: 4px 0; }
 
+/* ══════════════════════════════════════════
+   LOCATION SECTION STYLES
+══════════════════════════════════════════ */
+
+/* Prompt (no location yet) */
+.off-loc-prompt {
+  display: flex; flex-direction: column; align-items: center;
+  text-align: center; padding: 28px 20px; gap: 12px;
+  background: rgba(216,106,28,0.03); border-radius: 14px;
+  border: 1.5px dashed rgba(216,106,28,0.25);
+}
+.off-loc-prompt-icon {
+  width: 60px; height: 60px; border-radius: 50%;
+  background: rgba(216,106,28,0.08); display: flex;
+  align-items: center; justify-content: center;
+}
+.off-loc-prompt-title { font-size: 15px; font-weight: 700; color: #1A1208; }
+.off-loc-prompt-sub { font-size: 12px; color: #9A8570; line-height: 1.7; max-width: 300px; }
+
+/* Detecting spinner */
+.off-loc-detecting {
+  display: flex; align-items: center; gap: 16px;
+  padding: 20px; border-radius: 14px;
+  background: rgba(216,106,28,0.04); border: 1px solid rgba(216,106,28,0.15);
+}
+.off-loc-pulse {
+  width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
+  border: 3px solid rgba(216,106,28,0.15); border-top-color: #D86A1C;
+  animation: offSpin 0.8s linear infinite;
+}
+.off-loc-det-title { font-size: 13px; font-weight: 700; color: #1A1208; margin-bottom: 3px; }
+.off-loc-det-sub { font-size: 11px; color: #9A8570; }
+
+/* Error card */
+.off-loc-error-card {
+  display: flex; flex-direction: column; align-items: center;
+  text-align: center; padding: 24px; gap: 10px;
+  background: rgba(211,47,47,0.04); border-radius: 14px;
+  border: 1.5px solid rgba(211,47,47,0.2);
+}
+.off-loc-err-icon { font-size: 28px; }
+.off-loc-err-title { font-size: 14px; font-weight: 700; color: #D32F2F; }
+.off-loc-err-msg { font-size: 12px; color: #6B5B45; line-height: 1.6; max-width: 300px; }
+
+/* Shared button */
+.off-loc-btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 12px; font-weight: 700;
+  color: #D86A1C; background: rgba(216,106,28,0.1);
+  border: 1.5px solid rgba(216,106,28,0.3); border-radius: 24px;
+  padding: 9px 20px; cursor: pointer; transition: all 0.2s;
+}
+.off-loc-btn:hover { background: rgba(216,106,28,0.18); transform: translateY(-1px); }
+.off-loc-btn-main {
+  color: #fff; background: linear-gradient(135deg,#D86A1C,#F0924A);
+  border-color: transparent;
+  box-shadow: 0 6px 18px rgba(216,106,28,0.3);
+  padding: 12px 28px; font-size: 13px;
+}
+.off-loc-btn-main:hover { box-shadow: 0 10px 24px rgba(216,106,28,0.4); }
+
+/* Map view */
+.off-loc-map-wrap { display: flex; flex-direction: column; gap: 12px; }
+.off-loc-map-frame {
+  position: relative; border-radius: 14px; overflow: hidden;
+  height: 200px; border: 1.5px solid rgba(216,106,28,0.2);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+}
+.off-loc-map-frame iframe { width: 100%; height: 100%; border: 0; display: block; }
+.off-loc-map-badge {
+  position: absolute; top: 10px; left: 10px;
+  display: inline-flex; align-items: center; gap: 5px;
+  background: rgba(255,255,255,0.92); backdrop-filter: blur(8px);
+  border-radius: 20px; padding: 4px 12px;
+  font-size: 10px; font-weight: 700; color: #D86A1C;
+  border: 1px solid rgba(216,106,28,0.2);
+}
+.off-loc-addr-row {
+  display: flex; align-items: flex-start; gap: 8px;
+  background: rgba(248,241,234,0.8); border-radius: 10px;
+  padding: 10px 14px; border: 1px solid rgba(216,106,28,0.1);
+}
+.off-loc-addr-text { font-size: 12px; color: #6B5B45; line-height: 1.6; flex: 1; }
+.off-loc-update-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 10px; font-weight: 700; color: #D86A1C;
+  background: none; border: none; cursor: pointer;
+  white-space: nowrap; padding: 2px 0; flex-shrink: 0;
+  transition: opacity 0.2s;
+}
+.off-loc-update-btn:hover { opacity: 0.7; }
+.off-loc-coords-pill {
+  font-size: 10px; color: #C4B09A; font-family: monospace;
+  text-align: center; letter-spacing: 0.5px;
+}
+
+/* ── SUMMARY ── */
 .off-sticky-summary { position: sticky; top: 100px; background: #fff; border-radius: 20px; border: 1px solid rgba(216,106,28,0.15); box-shadow: 0 8px 32px rgba(216,106,28,0.12); padding: 24px; display: flex; flex-direction: column; gap: 14px; }
 .off-summary-item { display: flex; justify-content: space-between; align-items: center; }
 .off-summary-label { font-size: 11px; font-weight: 600; color: #9A8570; text-transform: uppercase; letter-spacing: 1px; }
 .off-summary-val { font-size: 13px; font-weight: 600; color: #1A1208; max-width: 180px; text-align: right; }
 .off-summary-total { font-family: 'Cormorant Garamond', serif; font-size: 28px; font-weight: 600; color: #D86A1C; }
 
+/* Location status pill */
+.off-loc-status-pill {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 11px; font-weight: 700; border-radius: 20px;
+  padding: 7px 14px; letter-spacing: 0.3px;
+}
+.off-loc-ok { background: rgba(76,175,80,0.1); color: #2E7D32; border: 1px solid rgba(76,175,80,0.25); }
+.off-loc-pending { background: rgba(216,106,28,0.08); color: #D86A1C; border: 1px solid rgba(216,106,28,0.2); }
+.off-loc-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.off-loc-ok .off-loc-dot { background: #4CAF50; }
+.off-loc-pending .off-loc-dot { background: #D86A1C; animation: offPulse 1.2s ease-in-out infinite; }
+@keyframes offPulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+/* ── BUTTONS ── */
 .off-btn-primary { width: 100%; padding: 15px; background: linear-gradient(135deg,#D86A1C,#F0924A); color: #fff; border: none; border-radius: 50px; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 14px; font-weight: 700; cursor: pointer; letter-spacing: 0.5px; box-shadow: 0 8px 24px rgba(216,106,28,0.35); transition: all 0.25s; display: flex; align-items: center; justify-content: center; }
 .off-btn-primary:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 14px 32px rgba(216,106,28,0.45); }
 .off-btn-primary:disabled { opacity: 0.75; cursor: not-allowed; }
+.off-btn-disabled-loc { background: linear-gradient(135deg,#9A8570,#B8A090) !important; box-shadow: none !important; }
 .off-btn-loading { opacity: 0.85; }
 .off-btn-spinner { width: 16px; height: 16px; border-radius: 50%; border: 2.5px solid rgba(255,255,255,0.3); border-top-color: #fff; animation: offSpin 0.7s linear infinite; margin-right: 10px; }
 .off-btn-outline { padding: 14px 28px; background: transparent; color: #D86A1C; border: 1.5px solid #D86A1C; border-radius: 50px; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 13px; font-weight: 700; cursor: pointer; transition: all 0.25s; width: 100%; }
 .off-btn-outline:hover { background: #D86A1C; color: #fff; transform: translateY(-2px); }
 .off-submit-btn { margin-top: 4px; }
 
+/* ── SUCCESS ── */
 .off-success-wrap { min-height: calc(100vh - 80px); display: flex; align-items: center; justify-content: center; padding: 40px 20px; }
 .off-success-card { background: #fff; border-radius: 28px; border: 1px solid rgba(216,106,28,0.12); box-shadow: 0 20px 60px rgba(0,0,0,0.1); padding: 48px 40px; max-width: 520px; width: 100%; text-align: center; animation: offScaleIn 0.5s cubic-bezier(0.22,1,0.36,1) both; }
 @keyframes offScaleIn { from{opacity:0;transform:scale(0.9);} to{opacity:1;transform:scale(1);} }
@@ -462,11 +771,12 @@ const STYLES = `
 .off-order-id-label { font-size: 10px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: #D86A1C; }
 .off-order-id-val { font-family: 'Cormorant Garamond', serif; font-size: 22px; font-weight: 600; color: #1A1208; }
 .off-success-details { background: #F8F1EA; border-radius: 14px; padding: 16px 20px; margin-bottom: 24px; display: flex; flex-direction: column; gap: 10px; text-align: left; }
-.off-suc-row { display: flex; justify-content: space-between; align-items: center; font-size: 13px; }
-.off-suc-row span { color: #9A8570; } .off-suc-row strong { color: #1A1208; font-weight: 600; }
+.off-suc-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; font-size: 13px; }
+.off-suc-row span { color: #9A8570; flex-shrink: 0; } .off-suc-row strong { color: #1A1208; font-weight: 600; text-align: right; }
 .off-status-placed { color: #D86A1C !important; }
 .off-success-btns { display: flex; flex-direction: column; gap: 10px; }
 
+/* ── RESPONSIVE ── */
 @media (max-width: 900px) {
   .off-layout { grid-template-columns: 1fr; }
   .off-sticky-summary { position: static; }
@@ -479,6 +789,10 @@ const STYLES = `
   .off-success-card { padding: 32px 20px; }
   .off-hero { padding: 32px 16px 28px; }
   .off-form-wrap { padding: 20px 14px 48px; }
+  .off-loc-map-frame { height: 160px; }
 }
-@media (prefers-reduced-motion: reduce) { .off-success-card { animation: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .off-success-card { animation: none; }
+  .off-loc-pending .off-loc-dot { animation: none; }
+}
 `;

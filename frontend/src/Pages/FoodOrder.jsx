@@ -253,33 +253,38 @@ export default function FoodOrder({ user, onLogout, cart }) {
     };
 
     const handleOrderNow = () => {
-        if (!coords) {
-            document.querySelector(".fo-location-card")?.scrollIntoView({ behavior: "smooth", block: "center" });
-            useMyLocation();
-            return;
+    if (!coords) {
+        document.querySelector(".fo-location-card")?.scrollIntoView({ behavior: "smooth", block: "center" });
+        useMyLocation();
+        return;
+    }
+
+    // ✅ Persist coords to localStorage so the order page can always recover them
+    localStorage.setItem(LOC_KEY, JSON.stringify(coords));
+    localStorage.setItem(ADDR_KEY, resolvedAddress);
+
+    navigate(
+        `/order/${encodeURIComponent(displayItem.name)}/${displayItem.veg ? "veg" : "non-veg"}/${encodeURIComponent(
+            variants.length ? variants[selVariant].price : displayItem.price
+        )}/${encodeURIComponent(user?.name || "Guest")}/${encodeURIComponent(user?.username || "guest")}/${encodeURIComponent(
+            `${coords.lat},${coords.lng}`
+        )}`,
+        {
+            state: {
+                qty,
+                note,
+                selectedVariant: variants.length ? variants[selVariant] : null,
+                selectedAddons: addonList.filter((_, i) => addons[i]),
+                itemId: item?._id,
+                itemImg: item?.img,
+                discount: item?.discount || null,
+                latitude: coords.lat,
+                longitude: coords.lng,
+                deliveryAddress: resolvedAddress,
+            },
         }
-        navigate(
-            `/order/${encodeURIComponent(displayItem.name)}/${displayItem.veg ? "veg" : "non-veg"}/${encodeURIComponent(
-                variants.length ? variants[selVariant].price : displayItem.price
-            )}/${encodeURIComponent(user?.name || "Guest")}/${encodeURIComponent(user?.username || "guest")}/${encodeURIComponent(
-                `${coords.lat},${coords.lng}`
-            )}`,
-            {
-                state: {
-                    qty,
-                    note,
-                    selectedVariant: variants.length ? variants[selVariant] : null,
-                    selectedAddons: addonList.filter((_, i) => addons[i]),
-                    itemId: item?._id,
-                    itemImg: item?.img,
-                    discount: item?.discount || null,
-                    latitude: coords.lat,
-                    longitude: coords.lng,
-                    deliveryAddress: resolvedAddress,
-                },
-            }
-        );
-    };
+    );
+};
 
     // Images — only show real images from DB, fallback to single placeholder
     const imgs = (() => {
