@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import Navbar from "../component/ui/Navbar";
 
@@ -6,8 +6,11 @@ const FONT_LINK =
     "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400;1,600&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap";
 
 const FA_LINK =
-    "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css";    
+    "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css";
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
+const LOC_KEY = "nk_delivery_coords";
+const ADDR_KEY = "nk_delivery_address";
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 function Stars({ rating }) {
@@ -49,12 +52,11 @@ function VegDot({ veg }) {
 
 // ── Main Component ─────────────────────────────────────────────────────────
 export default function FoodOrder({ user, onLogout, cart }) {
-    const { foodName, vegType, price, addressStr } = useParams();
+    const { foodName, vegType, price } = useParams();
     const navigate = useNavigate();
 
     const decodedFood = decodeURIComponent(foodName || "");
     const decodedPrice = decodeURIComponent(price || "₹0");
-    const isPlaceholder = decodeURIComponent(addressStr || "").startsWith("ADDR-");
 
     const [item, setItem] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -67,38 +69,59 @@ export default function FoodOrder({ user, onLogout, cart }) {
     const [added, setAdded] = useState(false);
     const [suggested, setSuggested] = useState([]);
     const [activeNav, setActiveNav] = useState("Menu");
-    const [autoAddress, setAutoAddress] = useState(null);
-const [locating, setLocating] = useState(false);
-const [locError, setLocError] = useState("");
 
-const useMyLocation = () => {
-    if (!navigator.geolocation) {
-        setLocError("Geolocation isn't supported by your browser.");
-        return;
-    }
-    setLocating(true);
-    setLocError("");
-    navigator.geolocation.getCurrentPosition(
-        async (pos) => {
-            const { latitude, longitude } = pos.coords;
-            try {
-                const res = await fetch(
-                    `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
-                );
-                const data = await res.json();
-                setAutoAddress(data?.display_name || `${latitude}, ${longitude}`);
-            } catch {
-                setAutoAddress(`${latitude}, ${longitude}`);
-            } finally {
-                setLocating(false);
-            }
-        },
-        () => {
-            setLocError("Couldn't get your location — check device permissions.");
-            setLocating(false);
+    // ── Delivery location (device geolocation, cached locally) ─────────────
+    const [coords, setCoords] = useState(() => {
+        try {
+            const saved = localStorage.getItem(LOC_KEY);
+            return saved ? JSON.parse(saved) : null;
+        } catch {
+            return null;
         }
-    );
-};
+    });
+    const [resolvedAddress, setResolvedAddress] = useState(() => localStorage.getItem(ADDR_KEY) || "");
+    const [locating, setLocating] = useState(false);
+    const [locError, setLocError] = useState("");
+
+    const useMyLocation = () => {
+        if (!navigator.geolocation) {
+            setLocError("Geolocation isn't supported by your browser.");
+            return;
+        }
+        setLocating(true);
+        setLocError("");
+        navigator.geolocation.getCurrentPosition(
+            async (pos) => {
+                const lat = pos.coords.latitude;
+                const lng = pos.coords.longitude;
+                setCoords({ lat, lng });
+                localStorage.setItem(LOC_KEY, JSON.stringify({ lat, lng }));
+                try {
+                    const res = await fetch(
+                        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`
+                    );
+                    const data = await res.json();
+                    const addr = data?.display_name || `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+                    setResolvedAddress(addr);
+                    localStorage.setItem(ADDR_KEY, addr);
+                } catch {
+                    const fallback = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+                    setResolvedAddress(fallback);
+                    localStorage.setItem(ADDR_KEY, fallback);
+                } finally {
+                    setLocating(false);
+                }
+            },
+            (err) => {
+                setLocating(false);
+                if (err.code === 1) setLocError("Location permission denied. Enable it in your browser settings.");
+                else if (err.code === 2) setLocError("Location unavailable right now. Please try again.");
+                else setLocError("Location request timed out. Please try again.");
+            },
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
+    };
+
     // ── Logout fix ─────────────────────────────────────────────────────────
     const handleLogout = () => {
         localStorage.removeItem("token");
@@ -145,9 +168,11 @@ const useMyLocation = () => {
         }
         if (decodedFood) load();
     }, [decodedFood]);
+
     useEffect(() => {
         window.scrollTo({ top: 0, behavior: "smooth" });
     }, [decodedFood]);
+
     const displayItem = item || {
         name: decodedFood,
         price: decodedPrice,
@@ -227,6 +252,35 @@ const useMyLocation = () => {
         }
     };
 
+    const handleOrderNow = () => {
+        if (!coords) {
+            document.querySelector(".fo-location-card")?.scrollIntoView({ behavior: "smooth", block: "center" });
+            useMyLocation();
+            return;
+        }
+        navigate(
+            `/order/${encodeURIComponent(displayItem.name)}/${displayItem.veg ? "veg" : "non-veg"}/${encodeURIComponent(
+                variants.length ? variants[selVariant].price : displayItem.price
+            )}/${encodeURIComponent(user?.name || "Guest")}/${encodeURIComponent(user?.username || "guest")}/${encodeURIComponent(
+                `${coords.lat},${coords.lng}`
+            )}`,
+            {
+                state: {
+                    qty,
+                    note,
+                    selectedVariant: variants.length ? variants[selVariant] : null,
+                    selectedAddons: addonList.filter((_, i) => addons[i]),
+                    itemId: item?._id,
+                    itemImg: item?.img,
+                    discount: item?.discount || null,
+                    latitude: coords.lat,
+                    longitude: coords.lng,
+                    deliveryAddress: resolvedAddress,
+                },
+            }
+        );
+    };
+
     // Images — only show real images from DB, fallback to single placeholder
     const imgs = (() => {
         const list = [];
@@ -262,24 +316,60 @@ const useMyLocation = () => {
                     cart={cart}
                 />
 
-                {/* ── ADDRESS NOTICE ── */}
-                {isPlaceholder && (
-    <div className="fo-addr-banner">
-        <i className="fa-solid fa-circle-info" />
-        {autoAddress ? (
-            <span>Delivering to: <strong>{autoAddress}</strong></span>
-        ) : (
-            <>
-                <span>No delivery address saved. You'll be asked to add one at checkout.</span>
-                <button onClick={useMyLocation} className="fo-locate-btn" disabled={locating}>
-                    <i className="fa-solid fa-location-crosshairs" />
-                    {locating ? "Locating…" : "Use My Location"}
-                </button>
-            </>
-        )}
-        {locError && <span className="fo-loc-error">{locError}</span>}
-    </div>
-)}
+                {/* ── DELIVERY LOCATION ── */}
+                <div className="fo-location-card">
+                    <div className="fo-location-header">
+                        <i className="fa-solid fa-location-dot fo-location-icon" />
+                        <div>
+                            <span className="fo-location-title">Delivery Location</span>
+                            <span className="fo-location-sub">
+                                {coords ? "We'll deliver to your current location" : "Enable location to continue ordering"}
+                            </span>
+                        </div>
+                        {coords && (
+                            <button className="fo-locate-btn fo-locate-btn-ghost" onClick={useMyLocation} disabled={locating}>
+                                <i className="fa-solid fa-rotate" />
+                                {locating ? "Updating…" : "Update"}
+                            </button>
+                        )}
+                    </div>
+
+                    {!coords && (
+                        <div className="fo-location-empty">
+                            <button className="fo-locate-btn" onClick={useMyLocation} disabled={locating}>
+                                <i className="fa-solid fa-location-crosshairs" />
+                                {locating ? "Detecting your location…" : "Use Current Location"}
+                            </button>
+                            {locError && (
+                                <span className="fo-loc-error">
+                                    <i className="fa-solid fa-triangle-exclamation" /> {locError}
+                                </span>
+                            )}
+                        </div>
+                    )}
+
+                    {coords && (
+                        <>
+                            <div className="fo-location-map">
+                                <iframe
+                                    title="Delivery location map"
+                                    src={`https://maps.google.com/maps?q=${coords.lat},${coords.lng}&z=16&output=embed`}
+                                    loading="lazy"
+                                    referrerPolicy="no-referrer-when-downgrade"
+                                />
+                            </div>
+                            <p className="fo-location-address">
+                                <i className="fa-solid fa-map-pin" />
+                                {resolvedAddress || `${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)}`}
+                            </p>
+                            {locError && (
+                                <span className="fo-loc-error">
+                                    <i className="fa-solid fa-triangle-exclamation" /> {locError}
+                                </span>
+                            )}
+                        </>
+                    )}
+                </div>
 
                 {/* ══════════════════════════════════════════
             PART 1 — HERO: image + order panel
@@ -289,11 +379,15 @@ const useMyLocation = () => {
                     <div className="fo-gallery">
                         <div className="fo-img-main-wrap">
                             <img src={imgs[activeImg]} alt={displayItem.name} className="fo-img-main" />
-                            {displayItem.featured && <div className="fo-featured-badge">✦ Featured</div>}
+                            {displayItem.featured && (
+                                <div className="fo-featured-badge">
+                                    <i className="fa-solid fa-star" /> Featured
+                                </div>
+                            )}
                             <div className={`fo-avail-badge ${displayItem.available ? "fo-avail-yes" : "fo-avail-no"}`}>
-    <i className="fa-solid fa-circle" style={{ fontSize: 6, marginRight: 5 }} />
-    {displayItem.available ? "Available" : "Out of Stock"}
-</div>
+                                <i className="fa-solid fa-circle" style={{ fontSize: 6, marginRight: 5 }} />
+                                {displayItem.available ? "Available" : "Out of Stock"}
+                            </div>
                             {/* Expand icon */}
                             <button className="fo-expand-btn" onClick={() => window.open(imgs[activeImg], "_blank")}>
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -442,9 +536,13 @@ const useMyLocation = () => {
                     <div className="fo-section-block fo-qty-row">
                         <label className="fo-field-label">Quantity</label>
                         <div className="fo-qty">
-                            <button onClick={() => setQty((q) => Math.max(1, q - 1))} className="fo-qty-btn">−</button>
+                            <button onClick={() => setQty((q) => Math.max(1, q - 1))} className="fo-qty-btn">
+                                <i className="fa-solid fa-minus" />
+                            </button>
                             <span className="fo-qty-val">{qty}</span>
-                            <button onClick={() => setQty((q) => q + 1)} className="fo-qty-btn">+</button>
+                            <button onClick={() => setQty((q) => q + 1)} className="fo-qty-btn">
+                                <i className="fa-solid fa-plus" />
+                            </button>
                         </div>
                     </div>
 
@@ -476,24 +574,10 @@ const useMyLocation = () => {
                                 </svg>
                                 {added ? (<><i className="fa-solid fa-check" style={{ marginRight: 6 }} /> Added to Cart</>) : "Add to Cart"}
                             </button>
-                            <button
-                                className="fo-btn-secondary"
-                                onClick={() => navigate(
-                                    `/order/${encodeURIComponent(displayItem.name)}/${displayItem.veg ? "veg" : "non-veg"}/${encodeURIComponent(variants.length ? variants[selVariant].price : displayItem.price)}/${encodeURIComponent(user?.name || "Guest")}/${encodeURIComponent(user?.username || "guest")}/${encodeURIComponent(autoAddress || decodeURIComponent(addressStr || "ADDR-none"))}`,
-                                    {
-                                        state: {
-                                            qty,
-                                            note,
-                                            selectedVariant: variants.length ? variants[selVariant] : null,
-                                            selectedAddons: addonList.filter((_, i) => addons[i]),
-                                            itemId: item?._id,
-                                            itemImg: item?.img,
-                                            discount: item?.discount || null,
-                                        }
-                                    }
+                            <button className="fo-btn-secondary" onClick={handleOrderNow}>
+                                {coords ? "Order Now" : (
+                                    <><i className="fa-solid fa-location-crosshairs" style={{ marginRight: 6 }} /> Enable Location</>
                                 )}
-                            >
-                                Order Now
                             </button>
                         </div>
                     </div>
@@ -507,7 +591,7 @@ const useMyLocation = () => {
                     <div className="fo-details-header">
                         <p className="fo-eyebrow">
                             Dish Details{" "}
-                            <span style={{ color: "#D86A1C", marginLeft: 6 }}>✦</span>
+                            <i className="fa-solid fa-star" style={{ color: "#D86A1C", marginLeft: 6, fontSize: 10 }} />
                         </p>
                         <h2 className="fo-section-h2">
                             About This <em className="fo-accent">Dish</em>
@@ -614,7 +698,9 @@ const useMyLocation = () => {
                                             className="fo-sug-card"
                                             onClick={() =>
                                                 navigate(
-                                                    `/${encodeURIComponent(s.name)}/${s.veg ? "veg" : "nonveg"}/${encodeURIComponent(s.price)}/Guest/guest/ADDR-none`
+                                                    `/${encodeURIComponent(s.name)}/${s.veg ? "veg" : "nonveg"}/${encodeURIComponent(s.price)}/Guest/guest/${encodeURIComponent(
+                                                        coords ? `${coords.lat},${coords.lng}` : "no-location"
+                                                    )}`
                                                 )
                                             }
                                         >
@@ -637,7 +723,7 @@ const useMyLocation = () => {
                                                             setCartCount((c) => c + 1);
                                                         }}
                                                     >
-                                                        + Add
+                                                        <i className="fa-solid fa-plus" /> Add
                                                     </button>
                                                 </div>
                                             </div>
@@ -649,10 +735,14 @@ const useMyLocation = () => {
                                     <div className="fo-sug-arrows">
                                         <button className="fo-sug-arrow" onClick={() => {
                                             document.querySelector(".fo-sug-grid").scrollBy({ left: -240, behavior: "smooth" });
-                                        }}>‹</button>
+                                        }}>
+                                            <i className="fa-solid fa-chevron-left" />
+                                        </button>
                                         <button className="fo-sug-arrow" onClick={() => {
                                             document.querySelector(".fo-sug-grid").scrollBy({ left: 240, behavior: "smooth" });
-                                        }}>›</button>
+                                        }}>
+                                            <i className="fa-solid fa-chevron-right" />
+                                        </button>
                                     </div>
                                 )}
                             </div>
@@ -701,13 +791,47 @@ const useMyLocation = () => {
 }
 @keyframes foSpin { to { transform: rotate(360deg); } }
 
-/* ── ADDRESS BANNER ── */
-.fo-addr-banner {
-  display: flex; align-items: center; gap: 8px;
-  font-size: 12px; color: #6B5B45;
-  background: rgba(216,106,28,0.06);
-  border-bottom: 1px solid rgba(216,106,28,0.15);
-  padding: 10px 48px;
+/* ── DELIVERY LOCATION CARD ── */
+.fo-location-card {
+  max-width: 1320px;
+  margin: 24px auto 0;
+  padding: 20px 28px;
+  background: #fff;
+  border-radius: 16px;
+  border: 1px solid rgba(216,106,28,0.12);
+  box-shadow: 0 4px 18px rgba(0,0,0,0.05);
+}
+.fo-location-header { display: flex; align-items: center; gap: 14px; }
+.fo-location-icon { font-size: 20px; color: #D86A1C; flex-shrink: 0; }
+.fo-location-title { display: block; font-size: 14px; font-weight: 700; color: #1A1208; }
+.fo-location-sub { display: block; font-size: 12px; color: #9A8570; margin-top: 2px; }
+.fo-location-empty { margin-top: 14px; display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+.fo-location-map { margin-top: 14px; height: 180px; border-radius: 14px; overflow: hidden; border: 1px solid rgba(216,106,28,0.12); }
+.fo-location-map iframe { width: 100%; height: 100%; border: 0; display: block; }
+.fo-location-address {
+  margin-top: 12px; font-size: 13px; color: #6B5B45; line-height: 1.5;
+  display: flex; align-items: flex-start; gap: 8px;
+}
+.fo-location-address i { color: #D86A1C; margin-top: 2px; }
+
+.fo-locate-btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 12px; font-weight: 700;
+  color: #fff; background: linear-gradient(135deg,#D86A1C,#F0924A);
+  border: none; border-radius: 24px; padding: 11px 22px;
+  cursor: pointer; transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 6px 18px rgba(216,106,28,0.3);
+}
+.fo-locate-btn:hover { transform: translateY(-1px); box-shadow: 0 10px 24px rgba(216,106,28,0.4); }
+.fo-locate-btn:disabled { opacity: 0.6; cursor: wait; transform: none; }
+.fo-locate-btn-ghost {
+  margin-left: auto; flex-shrink: 0;
+  background: rgba(216,106,28,0.1); color: #D86A1C;
+  box-shadow: none; padding: 8px 16px; font-size: 11px;
+}
+.fo-loc-error {
+  display: flex; align-items: center; gap: 6px;
+  color: #D32F2F; font-size: 12px; font-weight: 600;
 }
 
 /* ══════════════════════════════════════════
@@ -747,6 +871,7 @@ const useMyLocation = () => {
   color: #fff; font-size: 10px; font-weight: 700;
   letter-spacing: 1px; text-transform: uppercase;
   padding: 5px 14px; border-radius: 20px;
+  display: inline-flex; align-items: center; gap: 6px;
 }
 .fo-avail-badge {
   position: absolute; top: 14px; right: 48px;
@@ -944,8 +1069,9 @@ const useMyLocation = () => {
 }
 .fo-qty-btn {
   width: 40px; height: 40px; background: none; border: none;
-  font-size: 18px; color: #D86A1C; cursor: pointer;
-  transition: background 0.2s; font-weight: 300;
+  font-size: 13px; color: #D86A1C; cursor: pointer;
+  transition: background 0.2s;
+  display: flex; align-items: center; justify-content: center;
 }
 .fo-qty-btn:hover { background: rgba(216,106,28,0.08); }
 .fo-qty-val {
@@ -1002,6 +1128,7 @@ const useMyLocation = () => {
   font-family: 'Plus Jakarta Sans',sans-serif;
   font-size: 13px; font-weight: 700; cursor: pointer;
   transition: all 0.25s;
+  display: flex; align-items: center; justify-content: center;
 }
 .fo-btn-secondary:hover { background: #D86A1C; color: #fff; transform: translateY(-2px); }
 
@@ -1097,6 +1224,7 @@ const useMyLocation = () => {
 .fo-sug-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 2px; }
 .fo-sug-price { font-family: 'Cormorant Garamond', serif; font-size: 17px; font-weight: 600; color: #D86A1C; }
 .fo-sug-add {
+  display: inline-flex; align-items: center; gap: 5px;
   font-family: 'Plus Jakarta Sans',sans-serif; font-size: 11px; font-weight: 700;
   color: #D86A1C; background: rgba(216,106,28,0.1); border: none;
   border-radius: 20px; padding: 5px 14px; cursor: pointer; transition: all 0.2s;
@@ -1109,7 +1237,7 @@ const useMyLocation = () => {
 .fo-sug-arrow {
   width: 32px; height: 32px; border-radius: 50%;
   border: 1.5px solid rgba(216,106,28,0.3);
-  background: #fff; color: #D86A1C; font-size: 18px;
+  background: #fff; color: #D86A1C; font-size: 14px;
   cursor: pointer; display: flex; align-items: center; justify-content: center;
   transition: background 0.2s, color 0.2s;
 }
@@ -1158,11 +1286,13 @@ const useMyLocation = () => {
   .fo-gallery { position: static; }
   .fo-page2, .fo-page3 { padding-left: 32px; padding-right: 32px; }
   .fo-addons-grid { grid-template-columns: 1fr 1fr; }
-  .fo-addr-banner { padding: 10px 32px; }
+  .fo-location-card { margin: 20px 32px 0; padding: 16px 20px; }
 }
 @media (max-width: 768px) {
   .fo-page1, .fo-page2, .fo-page3 { padding-left: 16px; padding-right: 16px; }
-  .fo-addr-banner { padding: 10px 16px; }
+  .fo-location-card { margin: 16px 16px 0; padding: 16px; }
+  .fo-location-header { flex-wrap: wrap; }
+  .fo-locate-btn-ghost { margin-left: 0; }
   .fo-info-cards { grid-template-columns: repeat(2, 1fr); }
   .fo-sug-grid { grid-template-columns: repeat(2, minmax(160px, 1fr)); }
   .fo-cta-btns { flex-direction: column; }
