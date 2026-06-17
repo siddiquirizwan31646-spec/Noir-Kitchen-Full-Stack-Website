@@ -5,9 +5,10 @@ const Order   = require('../models/Order');
 // POST /api/orders — place a new order
 router.post('/', async (req, res) => {
     try {
-        const { latitude, longitude, deliveryAddress } = req.body;
+        const { latitude, longitude, deliveryAddress, itemName, fullName, mobile, baseAmount, totalAmount, quantity } = req.body;
 
-        if (latitude === undefined || longitude === undefined) {
+        // Validate required GPS fields
+        if (latitude == null || longitude == null) {
             return res.status(400).json({
                 success: false,
                 message: 'Delivery location is required. Please enable location access.',
@@ -20,7 +21,10 @@ router.post('/', async (req, res) => {
             });
         }
 
-        const order = await Order.create(req.body);
+        // Use new + save so pre('save') hook always runs
+        const order = new Order(req.body);
+        await order.save();
+
         res.status(201).json({
             success: true,
             orderId: order._id,
@@ -32,8 +36,7 @@ router.post('/', async (req, res) => {
     }
 });
 
-// GET /api/orders/nearby?lat=...&lng=...&radius=5000 — orders near a point
-// (for assigning the closest delivery partner)
+// GET /api/orders/nearby?lat=...&lng=...&radius=5000
 router.get('/nearby', async (req, res) => {
     try {
         const { lat, lng, radius = 5000 } = req.query;
@@ -54,7 +57,7 @@ router.get('/nearby', async (req, res) => {
     }
 });
 
-// GET /api/orders — get all orders (admin use)
+// GET /api/orders — all orders (admin)
 router.get('/', async (req, res) => {
     try {
         const orders = await Order.find().sort({ createdAt: -1 });
