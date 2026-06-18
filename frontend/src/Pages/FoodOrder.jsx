@@ -50,6 +50,107 @@ function VegDot({ veg }) {
     );
 }
 
+// ── Coupon Section ─────────────────────────────────────────────────────────
+function CouponSection({ subtotal, appliedCoupon, onApply, onRemove }) {
+    const [code, setCode] = useState("");
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState("");
+
+    const handleApply = async () => {
+        const trimmed = code.trim().toUpperCase();
+        if (!trimmed) { setError("Please enter a coupon code."); return; }
+        setLoading(true);
+        setError("");
+        try {
+            const res = await fetch(`${API_BASE}/api/coupons/validate`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ code: trimmed, orderAmount: subtotal }),
+            });
+            const data = await res.json();
+            if (!res.ok || !data.valid) {
+                setError(data.message || "Invalid or expired coupon.");
+            } else {
+                onApply(data.coupon);
+                setCode("");
+            }
+        } catch {
+            setError("Could not validate coupon. Try again.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleRemove = () => {
+        onRemove();
+        setCode("");
+        setError("");
+    };
+
+    if (appliedCoupon) {
+        const saved = appliedCoupon.discountType === "Percentage"
+            ? Math.min(
+                Math.round(subtotal * appliedCoupon.discountValue / 100),
+                appliedCoupon.maxDiscount > 0 ? appliedCoupon.maxDiscount : Infinity
+              )
+            : appliedCoupon.discountValue;
+
+        return (
+            <div className="fo-coupon-applied">
+                <div className="fo-coupon-applied-left">
+                    <div className="fo-coupon-applied-icon">
+                        <i className="fa-solid fa-ticket" />
+                    </div>
+                    <div>
+                        <span className="fo-coupon-applied-code">{appliedCoupon.code}</span>
+                        <span className="fo-coupon-applied-desc">
+                            {appliedCoupon.discountType === "Percentage"
+                                ? `${appliedCoupon.discountValue}% off${appliedCoupon.maxDiscount > 0 ? ` (max ₹${appliedCoupon.maxDiscount})` : ""}`
+                                : `Flat ₹${appliedCoupon.discountValue} off`}
+                        </span>
+                    </div>
+                </div>
+                <div className="fo-coupon-applied-right">
+                    <span className="fo-coupon-savings">−₹{saved.toLocaleString("en-IN")}</span>
+                    <button className="fo-coupon-remove" onClick={handleRemove} title="Remove coupon">
+                        <i className="fa-solid fa-xmark" />
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="fo-coupon-wrap">
+            <div className="fo-coupon-row">
+                <div className="fo-coupon-input-wrap">
+                    <i className="fa-solid fa-ticket fo-coupon-input-icon" />
+                    <input
+                        className="fo-coupon-input"
+                        placeholder="Enter coupon code"
+                        value={code}
+                        onChange={(e) => { setCode(e.target.value.toUpperCase()); setError(""); }}
+                        onKeyDown={(e) => e.key === "Enter" && handleApply()}
+                        maxLength={30}
+                    />
+                </div>
+                <button
+                    className={`fo-coupon-btn ${loading ? "fo-coupon-btn-loading" : ""}`}
+                    onClick={handleApply}
+                    disabled={loading}
+                >
+                    {loading ? <span className="fo-coupon-spinner" /> : "Apply"}
+                </button>
+            </div>
+            {error && (
+                <p className="fo-coupon-error">
+                    <i className="fa-solid fa-circle-exclamation" /> {error}
+                </p>
+            )}
+        </div>
+    );
+}
+
 // ── Main Component ─────────────────────────────────────────────────────────
 export default function FoodOrder({ user, onLogout, cart }) {
     const { foodName, vegType, price } = useParams();
@@ -70,24 +171,22 @@ export default function FoodOrder({ user, onLogout, cart }) {
     const [suggested, setSuggested] = useState([]);
     const [activeNav, setActiveNav] = useState("Menu");
 
-    // ── Delivery location (device geolocation, cached locally) ─────────────
+    // ── Coupon state ────────────────────────────────────────────────────────
+    const [appliedCoupon, setAppliedCoupon] = useState(null);
+
+    // ── Delivery location ──────────────────────────────────────────────────
     const [coords, setCoords] = useState(() => {
         try {
             const saved = localStorage.getItem(LOC_KEY);
             return saved ? JSON.parse(saved) : null;
-        } catch {
-            return null;
-        }
+        } catch { return null; }
     });
     const [resolvedAddress, setResolvedAddress] = useState(() => localStorage.getItem(ADDR_KEY) || "");
     const [locating, setLocating] = useState(false);
     const [locError, setLocError] = useState("");
 
     const useMyLocation = () => {
-        if (!navigator.geolocation) {
-            setLocError("Geolocation isn't supported by your browser.");
-            return;
-        }
+        if (!navigator.geolocation) { setLocError("Geolocation isn't supported by your browser."); return; }
         setLocating(true);
         setLocError("");
         navigator.geolocation.getCurrentPosition(
@@ -97,9 +196,7 @@ export default function FoodOrder({ user, onLogout, cart }) {
                 setCoords({ lat, lng });
                 localStorage.setItem(LOC_KEY, JSON.stringify({ lat, lng }));
                 try {
-                    const res = await fetch(
-                        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`
-                    );
+                    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
                     const data = await res.json();
                     const addr = data?.display_name || `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
                     setResolvedAddress(addr);
@@ -108,9 +205,7 @@ export default function FoodOrder({ user, onLogout, cart }) {
                     const fallback = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
                     setResolvedAddress(fallback);
                     localStorage.setItem(ADDR_KEY, fallback);
-                } finally {
-                    setLocating(false);
-                }
+                } finally { setLocating(false); }
             },
             (err) => {
                 setLocating(false);
@@ -122,7 +217,6 @@ export default function FoodOrder({ user, onLogout, cart }) {
         );
     };
 
-    // ── Logout fix ─────────────────────────────────────────────────────────
     const handleLogout = () => {
         localStorage.removeItem("token");
         localStorage.removeItem("user");
@@ -131,7 +225,6 @@ export default function FoodOrder({ user, onLogout, cart }) {
     };
 
     useEffect(() => {
-        // Reset all order state on food change
         setItem(null);
         setActiveImg(0);
         setSelVariant(0);
@@ -139,6 +232,7 @@ export default function FoodOrder({ user, onLogout, cart }) {
         setQty(1);
         setNote("");
         setAdded(false);
+        setAppliedCoupon(null);
 
         async function load() {
             setLoading(true);
@@ -151,9 +245,7 @@ export default function FoodOrder({ user, onLogout, cart }) {
                     );
                     setItem(found || null);
                     if (found) {
-                        const sug = json.data
-                            .filter((d) => d.category === found.category && d._id !== found._id)
-                            .slice(0, 4);
+                        const sug = json.data.filter((d) => d.category === found.category && d._id !== found._id).slice(0, 4);
                         setSuggested(sug.length ? sug : json.data.filter((d) => d._id !== found?._id).slice(0, 4));
                     } else {
                         setSuggested(json.data.slice(0, 4));
@@ -162,16 +254,12 @@ export default function FoodOrder({ user, onLogout, cart }) {
             } catch (err) {
                 console.error("Menu fetch failed:", err);
                 setItem(null);
-            } finally {
-                setLoading(false);
-            }
+            } finally { setLoading(false); }
         }
         if (decodedFood) load();
     }, [decodedFood]);
 
-    useEffect(() => {
-        window.scrollTo({ top: 0, behavior: "smooth" });
-    }, [decodedFood]);
+    useEffect(() => { window.scrollTo({ top: 0, behavior: "smooth" }); }, [decodedFood]);
 
     const displayItem = item || {
         name: decodedFood,
@@ -189,33 +277,24 @@ export default function FoodOrder({ user, onLogout, cart }) {
         tags: [],
     };
 
-    // Parse variants
     const variants = (() => {
         if (!item?.variants) return [];
         if (Array.isArray(item.variants)) return item.variants;
-        return item.variants
-            .split("|")
-            .map((v) => {
-                const [label, p, desc, serves] = v.split(":");
-                return { label, price: p, desc, serves };
-            })
-            .filter((v) => v.label);
+        return item.variants.split("|").map((v) => {
+            const [label, p, desc, serves] = v.split(":");
+            return { label, price: p, desc, serves };
+        }).filter((v) => v.label);
     })();
 
-    // Parse addons
     const addonList = (() => {
         if (!item?.addons) return [];
         if (Array.isArray(item.addons)) return item.addons;
-        return item.addons
-            .split("|")
-            .map((a) => {
-                const [label, p, img] = a.split(":");
-                return { label, price: p, img };
-            })
-            .filter((a) => a.label);
+        return item.addons.split("|").map((a) => {
+            const [label, p, img] = a.split(":");
+            return { label, price: p, img };
+        }).filter((a) => a.label);
     })();
 
-    // Price calc
     const basePrice = (() => {
         const src = variants.length ? variants[selVariant]?.price : item?.price || decodedPrice;
         return parseInt(String(src || "0").replace(/[^\d]/g, "")) || 0;
@@ -223,8 +302,7 @@ export default function FoodOrder({ user, onLogout, cart }) {
 
     const selectedVariantBasePrice = (() => {
         if (!variants.length) return basePrice;
-        const first = parseInt(String(variants[0]?.price || "0").replace(/[^\d]/g, "")) || 0;
-        return first;
+        return parseInt(String(variants[0]?.price || "0").replace(/[^\d]/g, "")) || 0;
     })();
 
     const addonTotal = addonList.reduce((sum, a, i) => {
@@ -232,7 +310,17 @@ export default function FoodOrder({ user, onLogout, cart }) {
         return sum + (parseInt(String(a.price || "0").replace(/[^\d]/g, "")) || 0);
     }, 0);
 
-    const total = (basePrice + addonTotal) * qty;
+    const subtotal = (basePrice + addonTotal) * qty;
+
+    // ── Coupon discount calculation ────────────────────────────────────────
+    const couponDiscount = (() => {
+        if (!appliedCoupon) return 0;
+        if (appliedCoupon.discountType === "Flat") return Math.min(appliedCoupon.discountValue, subtotal);
+        const pct = Math.round(subtotal * appliedCoupon.discountValue / 100);
+        return appliedCoupon.maxDiscount > 0 ? Math.min(pct, appliedCoupon.maxDiscount) : pct;
+    })();
+
+    const total = subtotal - couponDiscount;
 
     const handleAddToCart = async () => {
         if (!item || !cart) return;
@@ -253,49 +341,48 @@ export default function FoodOrder({ user, onLogout, cart }) {
     };
 
     const handleOrderNow = () => {
-    if (!coords) {
-        document.querySelector(".fo-location-card")?.scrollIntoView({ behavior: "smooth", block: "center" });
-        useMyLocation();
-        return;
-    }
-
-    // ✅ Persist coords to localStorage so the order page can always recover them
-    localStorage.setItem(LOC_KEY, JSON.stringify(coords));
-    localStorage.setItem(ADDR_KEY, resolvedAddress);
-
-    navigate(
-        `/order/${encodeURIComponent(displayItem.name)}/${displayItem.veg ? "veg" : "non-veg"}/${encodeURIComponent(
-            variants.length ? variants[selVariant].price : displayItem.price
-        )}/${encodeURIComponent(user?.name || "Guest")}/${encodeURIComponent(user?.username || "guest")}/${encodeURIComponent(
-            `${coords.lat},${coords.lng}`
-        )}`,
-        {
-            state: {
-                qty,
-                note,
-                selectedVariant: variants.length ? variants[selVariant] : null,
-                selectedAddons: addonList.filter((_, i) => addons[i]),
-                itemId: item?._id,
-                itemImg: item?.img,
-                discount: item?.discount || null,
-                latitude: coords.lat,
-                longitude: coords.lng,
-                deliveryAddress: resolvedAddress,
-            },
+        if (!coords) {
+            document.querySelector(".fo-location-card")?.scrollIntoView({ behavior: "smooth", block: "center" });
+            useMyLocation();
+            return;
         }
-    );
-};
+        localStorage.setItem(LOC_KEY, JSON.stringify(coords));
+        localStorage.setItem(ADDR_KEY, resolvedAddress);
 
-    // Images — only show real images from DB, fallback to single placeholder
+        navigate(
+            `/order/${encodeURIComponent(displayItem.name)}/${displayItem.veg ? "veg" : "non-veg"}/${encodeURIComponent(
+                variants.length ? variants[selVariant].price : displayItem.price
+            )}/${encodeURIComponent(user?.name || "Guest")}/${encodeURIComponent(user?.username || "guest")}/${encodeURIComponent(
+                `${coords.lat},${coords.lng}`
+            )}`,
+            {
+                state: {
+                    qty,
+                    note,
+                    selectedVariant: variants.length ? variants[selVariant] : null,
+                    selectedAddons: addonList.filter((_, i) => addons[i]),
+                    itemId: item?._id,
+                    itemImg: item?.img,
+                    discount: item?.discount || null,
+                    latitude: coords.lat,
+                    longitude: coords.lng,
+                    deliveryAddress: resolvedAddress,
+                    // ── Pass coupon to order form ──
+                    appliedCoupon: appliedCoupon || null,
+                    couponDiscount,
+                },
+            }
+        );
+    };
+
     const imgs = (() => {
         const list = [];
         if (item?.img) list.push(item.img);
         if (item?.images && Array.isArray(item.images)) list.push(...item.images);
         if (!list.length) list.push("https://images.unsplash.com/photo-1585937421612-70a008356fbe?w=600&q=80");
-        return [...new Set(list)]; // deduplicate
+        return [...new Set(list)];
     })();
 
-    // Tags from DB or fallback
     const tags = item?.tags || (displayItem.veg ? ["Gluten Free", "No Added Preservatives"] : ["Gluten Free"]);
 
     if (loading)
@@ -313,13 +400,7 @@ export default function FoodOrder({ user, onLogout, cart }) {
             <link href={FONT_LINK} rel="stylesheet" />
             <link href={FA_LINK} rel="stylesheet" />
             <div className="fo-root">
-                <Navbar
-                    user={user}
-                    onLogout={handleLogout}
-                    activeNav={activeNav}
-                    setActiveNav={setActiveNav}
-                    cart={cart}
-                />
+                <Navbar user={user} onLogout={handleLogout} activeNav={activeNav} setActiveNav={setActiveNav} cart={cart} />
 
                 {/* ── DELIVERY LOCATION ── */}
                 <div className="fo-location-card">
@@ -376,9 +457,7 @@ export default function FoodOrder({ user, onLogout, cart }) {
                     )}
                 </div>
 
-                {/* ══════════════════════════════════════════
-            PART 1 — HERO: image + order panel
-        ══════════════════════════════════════════ */}
+                {/* ══ PART 1 — HERO ══ */}
                 <div className="fo-page1">
                     {/* LEFT: Gallery */}
                     <div className="fo-gallery">
@@ -393,7 +472,6 @@ export default function FoodOrder({ user, onLogout, cart }) {
                                 <i className="fa-solid fa-circle" style={{ fontSize: 6, marginRight: 5 }} />
                                 {displayItem.available ? "Available" : "Out of Stock"}
                             </div>
-                            {/* Expand icon */}
                             <button className="fo-expand-btn" onClick={() => window.open(imgs[activeImg], "_blank")}>
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                     <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
@@ -401,15 +479,10 @@ export default function FoodOrder({ user, onLogout, cart }) {
                             </button>
                         </div>
 
-                        {/* Thumbnails — only show if more than 1 image */}
                         {imgs.length > 1 && (
                             <div className="fo-thumbs">
                                 {imgs.map((src, i) => (
-                                    <button
-                                        key={i}
-                                        onClick={() => setActiveImg(i)}
-                                        className={`fo-thumb ${activeImg === i ? "fo-thumb-active" : ""}`}
-                                    >
+                                    <button key={i} onClick={() => setActiveImg(i)} className={`fo-thumb ${activeImg === i ? "fo-thumb-active" : ""}`}>
                                         <img src={src} alt="" />
                                     </button>
                                 ))}
@@ -430,7 +503,6 @@ export default function FoodOrder({ user, onLogout, cart }) {
 
                         <p className="fo-desc">{displayItem.desc}</p>
 
-                        {/* Price row */}
                         <div className="fo-price-row">
                             <span className="fo-price-main">
                                 {variants.length ? variants[selVariant]?.price : displayItem.price}
@@ -444,7 +516,6 @@ export default function FoodOrder({ user, onLogout, cart }) {
                             </span>
                         </div>
 
-                        {/* Tags */}
                         <div className="fo-tags-row">
                             <span className="fo-tag fo-tag-gf">Gluten Info</span>
                             {tags.map((t) => (
@@ -452,7 +523,6 @@ export default function FoodOrder({ user, onLogout, cart }) {
                             ))}
                         </div>
 
-                        {/* Spice */}
                         {(displayItem.spice ?? 0) > 0 && (
                             <div className="fo-field">
                                 <label className="fo-field-label">Spice Level</label>
@@ -467,7 +537,6 @@ export default function FoodOrder({ user, onLogout, cart }) {
                             </div>
                         )}
 
-                        {/* Dietary */}
                         <div className="fo-dietary-row">
                             <VegBadge veg={displayItem.veg} />
                             {displayItem.vegan && <span className="fo-tag fo-tag-vegan">Vegan</span>}
@@ -476,9 +545,7 @@ export default function FoodOrder({ user, onLogout, cart }) {
                     </div>
                 </div>
 
-                {/* ══════════════════════════════════════════
-            PART 2 — VARIANTS, ADD-ONS, QTY, CTA
-        ══════════════════════════════════════════ */}
+                {/* ══ PART 2 — VARIANTS, ADD-ONS, COUPON, QTY, CTA ══ */}
                 <div className="fo-page2">
 
                     {/* Variants */}
@@ -490,11 +557,7 @@ export default function FoodOrder({ user, onLogout, cart }) {
                                     const vPrice = parseInt(String(v.price || "0").replace(/[^\d]/g, "")) || 0;
                                     const diff = vPrice - selectedVariantBasePrice;
                                     return (
-                                        <label
-                                            key={i}
-                                            className={`fo-variant-card ${selVariant === i ? "fo-variant-sel" : ""}`}
-                                            onClick={() => setSelVariant(i)}
-                                        >
+                                        <label key={i} className={`fo-variant-card ${selVariant === i ? "fo-variant-sel" : ""}`} onClick={() => setSelVariant(i)}>
                                             <div className="fo-variant-radio">
                                                 <span className={`fo-radio ${selVariant === i ? "fo-radio-sel" : ""}`} />
                                             </div>
@@ -504,9 +567,7 @@ export default function FoodOrder({ user, onLogout, cart }) {
                                             </div>
                                             <div className="fo-variant-price-col">
                                                 <span className="fo-variant-price">{v.price}</span>
-                                                {i > 0 && diff > 0 && (
-                                                    <span className="fo-variant-diff">+ ₹{diff}</span>
-                                                )}
+                                                {i > 0 && diff > 0 && <span className="fo-variant-diff">+ ₹{diff}</span>}
                                             </div>
                                         </label>
                                     );
@@ -522,12 +583,7 @@ export default function FoodOrder({ user, onLogout, cart }) {
                             <div className="fo-addons-grid">
                                 {addonList.map((a, i) => (
                                     <label key={i} className={`fo-addon-card ${addons[i] ? "fo-addon-sel" : ""}`}>
-                                        <input
-                                            type="checkbox"
-                                            checked={!!addons[i]}
-                                            onChange={(e) => setAddons((prev) => ({ ...prev, [i]: e.target.checked }))}
-                                            className="fo-addon-cb"
-                                        />
+                                        <input type="checkbox" checked={!!addons[i]} onChange={(e) => setAddons((prev) => ({ ...prev, [i]: e.target.checked }))} className="fo-addon-cb" />
                                         {a.img && <img src={a.img} alt={a.label} className="fo-addon-img" />}
                                         <span className="fo-addon-name">{a.label}</span>
                                         <span className="fo-addon-price">+ {a.price}</span>
@@ -563,17 +619,49 @@ export default function FoodOrder({ user, onLogout, cart }) {
                         />
                     </div>
 
+                    {/* ── COUPON ── */}
+                    <div className="fo-section-block">
+                        <label className="fo-field-label">Have a Coupon?</label>
+                        <CouponSection
+                            subtotal={subtotal}
+                            appliedCoupon={appliedCoupon}
+                            onApply={setAppliedCoupon}
+                            onRemove={() => setAppliedCoupon(null)}
+                        />
+                    </div>
+
                     {/* CTA */}
                     <div className="fo-cta-block">
-                        <div className="fo-total-row">
-                            <span className="fo-total-label">Total</span>
-                            <span className="fo-total-val">₹{total.toLocaleString("en-IN")}</span>
+                        <div className="fo-total-section">
+                            {couponDiscount > 0 && (
+                                <>
+                                    <div className="fo-total-row fo-total-row-sub">
+                                        <span className="fo-total-label-sm">Subtotal</span>
+                                        <span className="fo-total-val-sm">₹{subtotal.toLocaleString("en-IN")}</span>
+                                    </div>
+                                    <div className="fo-total-row fo-total-row-discount">
+                                        <span className="fo-total-label-sm">
+                                            <i className="fa-solid fa-ticket" style={{ marginRight: 5 }} />
+                                            Coupon ({appliedCoupon.code})
+                                        </span>
+                                        <span className="fo-total-discount-val">−₹{couponDiscount.toLocaleString("en-IN")}</span>
+                                    </div>
+                                    <div className="fo-total-divider" />
+                                </>
+                            )}
+                            <div className="fo-total-row">
+                                <span className="fo-total-label">Total</span>
+                                <span className="fo-total-val">₹{total.toLocaleString("en-IN")}</span>
+                            </div>
+                            {couponDiscount > 0 && (
+                                <p className="fo-total-savings-msg">
+                                    <i className="fa-solid fa-circle-check" /> You save ₹{couponDiscount.toLocaleString("en-IN")} with this coupon!
+                                </p>
+                            )}
                         </div>
+
                         <div className="fo-cta-btns">
-                            <button
-                                onClick={handleAddToCart}
-                                className={`fo-btn-primary ${added ? "fo-btn-added" : ""}`}
-                            >
+                            <button onClick={handleAddToCart} className={`fo-btn-primary ${added ? "fo-btn-added" : ""}`}>
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: 8 }}>
                                     <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z" /><line x1="3" y1="6" x2="21" y2="6" /><path d="M16 10a4 4 0 01-8 0" />
                                 </svg>
@@ -588,11 +676,8 @@ export default function FoodOrder({ user, onLogout, cart }) {
                     </div>
                 </div>
 
-                {/* ══════════════════════════════════════════
-            PART 3 — DISH DETAILS + SUGGESTED
-        ══════════════════════════════════════════ */}
+                {/* ══ PART 3 — DISH DETAILS + SUGGESTED ══ */}
                 <div className="fo-page3">
-                    {/* Dish Details header */}
                     <div className="fo-details-header">
                         <p className="fo-eyebrow">
                             Dish Details{" "}
@@ -603,66 +688,14 @@ export default function FoodOrder({ user, onLogout, cart }) {
                         </h2>
                     </div>
 
-                    {/* Info cards row */}
                     <div className="fo-info-cards">
                         {[
-                            {
-                                icon: (
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D86A1C" strokeWidth="1.8">
-                                        <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" /><polyline points="9 22 9 12 15 12 15 22" />
-                                    </svg>
-                                ),
-                                label: "Category",
-                                val: displayItem.category || "—",
-                            },
-                            {
-                                icon: (
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D86A1C" strokeWidth="1.8">
-                                        <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
-                                    </svg>
-                                ),
-                                label: "Availability",
-                                val: displayItem.available ? "Available" : "Out of Stock",
-                                green: displayItem.available,
-                            },
-                            {
-                                icon: (
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D86A1C" strokeWidth="1.8">
-                                        <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
-                                    </svg>
-                                ),
-                                label: "Prep Time",
-                                val: `${displayItem.prepTime || 20}–${(displayItem.prepTime || 20) + 5} mins`,
-                            },
-                            {
-                                icon: (
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D86A1C" strokeWidth="1.8">
-                                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                                    </svg>
-                                ),
-                                label: "Dietary",
-                                val: displayItem.veg ? (displayItem.vegan ? "Vegan" : "Vegetarian") : "Non-Vegetarian",
-                            },
-                            {
-                                icon: (
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D86A1C" strokeWidth="1.8">
-                                        <path d="M12 2C8 2 6 6 6 9c0 2.5 1.5 4.5 3 6l1 5h4l1-5c1.5-1.5 3-3.5 3-6 0-3-2-7-6-7z" />
-                                    </svg>
-                                ),
-                                label: "Spice Level",
-                                val: ["None", "Mild", "Medium", "Hot", "Extra Hot"][displayItem.spice || 0],
-                            },
-                            {
-                                icon: (
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D86A1C" strokeWidth="1.8">
-                                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
-                                    </svg>
-                                ),
-                                label: "Created On",
-                                val: item?.createdAt
-                                    ? new Date(item.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
-                                    : "—",
-                            },
+                            { icon: (<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D86A1C" strokeWidth="1.8"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" /><polyline points="9 22 9 12 15 12 15 22" /></svg>), label: "Category", val: displayItem.category || "—" },
+                            { icon: (<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D86A1C" strokeWidth="1.8"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>), label: "Availability", val: displayItem.available ? "Available" : "Out of Stock", green: displayItem.available },
+                            { icon: (<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D86A1C" strokeWidth="1.8"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>), label: "Prep Time", val: `${displayItem.prepTime || 20}–${(displayItem.prepTime || 20) + 5} mins` },
+                            { icon: (<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D86A1C" strokeWidth="1.8"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>), label: "Dietary", val: displayItem.veg ? (displayItem.vegan ? "Vegan" : "Vegetarian") : "Non-Vegetarian" },
+                            { icon: (<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D86A1C" strokeWidth="1.8"><path d="M12 2C8 2 6 6 6 9c0 2.5 1.5 4.5 3 6l1 5h4l1-5c1.5-1.5 3-3.5 3-6 0-3-2-7-6-7z" /></svg>), label: "Spice Level", val: ["None", "Mild", "Medium", "Hot", "Extra Hot"][displayItem.spice || 0] },
+                            { icon: (<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D86A1C" strokeWidth="1.8"><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>), label: "Created On", val: item?.createdAt ? new Date(item.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—" },
                         ].map(({ icon, label, val, green }) => (
                             <div key={label} className="fo-info-card">
                                 <div className="fo-info-icon">{icon}</div>
@@ -672,24 +705,17 @@ export default function FoodOrder({ user, onLogout, cart }) {
                         ))}
                     </div>
 
-                    {/* Ingredients + Suggested side by side */}
                     <div className="fo-bottom-row">
-                        {/* Ingredients */}
                         {displayItem.ingredients && (
                             <div className="fo-ingredients-block">
                                 <p className="fo-field-label" style={{ marginBottom: 12 }}>Ingredients</p>
                                 <p className="fo-ingredients-text">{displayItem.ingredients}</p>
                                 <div className="fo-ing-img-wrap">
-                                    <img
-                                        src="https://i.postimg.cc/RFqpy42L/Chat-GPT-Image-Jun-13-2026-07-50-20-PM.png"
-                                        alt="Ingredients"
-                                        className="fo-ing-img"
-                                    />
+                                    <img src="https://i.postimg.cc/RFqpy42L/Chat-GPT-Image-Jun-13-2026-07-50-20-PM.png" alt="Ingredients" className="fo-ing-img" />
                                 </div>
                             </div>
                         )}
 
-                        {/* Suggested */}
                         <div className="fo-suggested-block">
                             <p className="fo-eyebrow" style={{ marginBottom: 16 }}>
                                 You May Also Like{" "}
@@ -698,17 +724,8 @@ export default function FoodOrder({ user, onLogout, cart }) {
                             <div className="fo-sug-scroll-wrap">
                                 <div className="fo-sug-grid">
                                     {suggested.map((s) => (
-                                        <div
-                                            key={s._id}
-                                            className="fo-sug-card"
-                                            onClick={() =>
-                                                navigate(
-                                                    `/${encodeURIComponent(s.name)}/${s.veg ? "veg" : "nonveg"}/${encodeURIComponent(s.price)}/Guest/guest/${encodeURIComponent(
-                                                        coords ? `${coords.lat},${coords.lng}` : "no-location"
-                                                    )}`
-                                                )
-                                            }
-                                        >
+                                        <div key={s._id} className="fo-sug-card"
+                                            onClick={() => navigate(`/${encodeURIComponent(s.name)}/${s.veg ? "veg" : "nonveg"}/${encodeURIComponent(s.price)}/Guest/guest/${encodeURIComponent(coords ? `${coords.lat},${coords.lng}` : "no-location")}`)}>
                                             <div className="fo-sug-img-wrap">
                                                 <img src={s.img} alt={s.name} className="fo-sug-img" loading="lazy" />
                                                 <VegDot veg={s.veg} />
@@ -721,13 +738,7 @@ export default function FoodOrder({ user, onLogout, cart }) {
                                                 </div>
                                                 <div className="fo-sug-footer">
                                                     <span className="fo-sug-price">{s.price}</span>
-                                                    <button
-                                                        className="fo-sug-add"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            setCartCount((c) => c + 1);
-                                                        }}
-                                                    >
+                                                    <button className="fo-sug-add" onClick={(e) => { e.stopPropagation(); setCartCount((c) => c + 1); }}>
                                                         <i className="fa-solid fa-plus" /> Add
                                                     </button>
                                                 </div>
@@ -735,17 +746,12 @@ export default function FoodOrder({ user, onLogout, cart }) {
                                         </div>
                                     ))}
                                 </div>
-                                {/* Scroll arrows if overflow */}
                                 {suggested.length > 3 && (
                                     <div className="fo-sug-arrows">
-                                        <button className="fo-sug-arrow" onClick={() => {
-                                            document.querySelector(".fo-sug-grid").scrollBy({ left: -240, behavior: "smooth" });
-                                        }}>
+                                        <button className="fo-sug-arrow" onClick={() => document.querySelector(".fo-sug-grid").scrollBy({ left: -240, behavior: "smooth" })}>
                                             <i className="fa-solid fa-chevron-left" />
                                         </button>
-                                        <button className="fo-sug-arrow" onClick={() => {
-                                            document.querySelector(".fo-sug-grid").scrollBy({ left: 240, behavior: "smooth" });
-                                        }}>
+                                        <button className="fo-sug-arrow" onClick={() => document.querySelector(".fo-sug-grid").scrollBy({ left: 240, behavior: "smooth" })}>
                                             <i className="fa-solid fa-chevron-right" />
                                         </button>
                                     </div>
@@ -786,7 +792,6 @@ export default function FoodOrder({ user, onLogout, cart }) {
   min-height: 100vh;
 }
 
-/* ── LOADER ── */
 .fo-loader {
   width: 40px; height: 40px; border-radius: 50%;
   border: 3px solid rgba(216,106,28,0.15);
@@ -798,12 +803,9 @@ export default function FoodOrder({ user, onLogout, cart }) {
 
 /* ── DELIVERY LOCATION CARD ── */
 .fo-location-card {
-  max-width: 1320px;
-  margin: 24px auto 0;
-  padding: 20px 28px;
-  background: #fff;
-  border-radius: 16px;
-  border: 1px solid rgba(216,106,28,0.12);
+  max-width: 1320px; margin: 24px auto 0;
+  padding: 20px 28px; background: #fff;
+  border-radius: 16px; border: 1px solid rgba(216,106,28,0.12);
   box-shadow: 0 4px 18px rgba(0,0,0,0.05);
 }
 .fo-location-header { display: flex; align-items: center; gap: 14px; }
@@ -813,16 +815,13 @@ export default function FoodOrder({ user, onLogout, cart }) {
 .fo-location-empty { margin-top: 14px; display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
 .fo-location-map { margin-top: 14px; height: 180px; border-radius: 14px; overflow: hidden; border: 1px solid rgba(216,106,28,0.12); }
 .fo-location-map iframe { width: 100%; height: 100%; border: 0; display: block; }
-.fo-location-address {
-  margin-top: 12px; font-size: 13px; color: #6B5B45; line-height: 1.5;
-  display: flex; align-items: flex-start; gap: 8px;
-}
+.fo-location-address { margin-top: 12px; font-size: 13px; color: #6B5B45; line-height: 1.5; display: flex; align-items: flex-start; gap: 8px; }
 .fo-location-address i { color: #D86A1C; margin-top: 2px; }
 
 .fo-locate-btn {
   display: inline-flex; align-items: center; gap: 8px;
-  font-size: 12px; font-weight: 700;
-  color: #fff; background: linear-gradient(135deg,#D86A1C,#F0924A);
+  font-size: 12px; font-weight: 700; color: #fff;
+  background: linear-gradient(135deg,#D86A1C,#F0924A);
   border: none; border-radius: 24px; padding: 11px 22px;
   cursor: pointer; transition: transform 0.2s, box-shadow 0.2s;
   box-shadow: 0 6px 18px rgba(216,106,28,0.3);
@@ -834,390 +833,201 @@ export default function FoodOrder({ user, onLogout, cart }) {
   background: rgba(216,106,28,0.1); color: #D86A1C;
   box-shadow: none; padding: 8px 16px; font-size: 11px;
 }
-.fo-loc-error {
-  display: flex; align-items: center; gap: 6px;
-  color: #D32F2F; font-size: 12px; font-weight: 600;
-}
+.fo-loc-error { display: flex; align-items: center; gap: 6px; color: #D32F2F; font-size: 12px; font-weight: 600; }
 
-/* ══════════════════════════════════════════
-   PART 1 — HERO
-══════════════════════════════════════════ */
+/* ══ PART 1 — HERO ══ */
 .fo-page1 {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 48px;
-  max-width: 1320px;
-  margin: 0 auto;
-  padding: 36px 48px 40px;
-  align-items: start;
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 48px; max-width: 1320px; margin: 0 auto;
+  padding: 36px 48px 40px; align-items: start;
 }
-
-/* ── GALLERY ── */
 .fo-gallery { position: sticky; top: 100px; }
-
-.fo-img-main-wrap {
-  position: relative;
-  border-radius: 20px;
-  overflow: hidden;
-  aspect-ratio: 4/3;
-  box-shadow: 0 20px 56px rgba(0,0,0,0.18);
-  background: #EEE;
-}
-.fo-img-main {
-  width: 100%; height: 100%; object-fit: cover;
-  transition: transform 0.6s cubic-bezier(0.22,1,0.36,1);
-  display: block;
-}
+.fo-img-main-wrap { position: relative; border-radius: 20px; overflow: hidden; aspect-ratio: 4/3; box-shadow: 0 20px 56px rgba(0,0,0,0.18); background: #EEE; }
+.fo-img-main { width: 100%; height: 100%; object-fit: cover; transition: transform 0.6s cubic-bezier(0.22,1,0.36,1); display: block; }
 .fo-img-main-wrap:hover .fo-img-main { transform: scale(1.03); }
-
-.fo-featured-badge {
-  position: absolute; top: 14px; left: 14px;
-  background: linear-gradient(135deg,#D86A1C,#F0924A);
-  color: #fff; font-size: 10px; font-weight: 700;
-  letter-spacing: 1px; text-transform: uppercase;
-  padding: 5px 14px; border-radius: 20px;
-  display: inline-flex; align-items: center; gap: 6px;
-}
-.fo-avail-badge {
-  position: absolute; top: 14px; right: 48px;
-  font-size: 10px; font-weight: 700;
-  padding: 5px 12px; border-radius: 20px;
-  backdrop-filter: blur(12px);
-}
+.fo-featured-badge { position: absolute; top: 14px; left: 14px; background: linear-gradient(135deg,#D86A1C,#F0924A); color: #fff; font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; padding: 5px 14px; border-radius: 20px; display: inline-flex; align-items: center; gap: 6px; }
+.fo-avail-badge { position: absolute; top: 14px; right: 48px; font-size: 10px; font-weight: 700; padding: 5px 12px; border-radius: 20px; backdrop-filter: blur(12px); }
 .fo-avail-yes { background: rgba(76,175,80,0.15); color: #2E7D32; border: 1px solid rgba(76,175,80,0.3); }
-.fo-avail-no  { background: rgba(211,47,47,0.15); color: #D32F2F; border: 1px solid rgba(211,47,47,0.3); }
-
-.fo-expand-btn {
-  position: absolute; bottom: 14px; right: 14px;
-  width: 34px; height: 34px; border-radius: 10px;
-  background: rgba(255,255,255,0.85); backdrop-filter: blur(8px);
-  border: none; cursor: pointer; color: #1A1208;
-  display: flex; align-items: center; justify-content: center;
-  transition: background 0.2s;
-}
+.fo-avail-no { background: rgba(211,47,47,0.15); color: #D32F2F; border: 1px solid rgba(211,47,47,0.3); }
+.fo-expand-btn { position: absolute; bottom: 14px; right: 14px; width: 34px; height: 34px; border-radius: 10px; background: rgba(255,255,255,0.85); backdrop-filter: blur(8px); border: none; cursor: pointer; color: #1A1208; display: flex; align-items: center; justify-content: center; transition: background 0.2s; }
 .fo-expand-btn:hover { background: #fff; }
-
-.fo-thumbs {
-  display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap;
-}
-.fo-thumb {
-  border: 2px solid transparent; border-radius: 10px;
-  overflow: hidden; width: 80px; height: 64px;
-  cursor: pointer; background: none; padding: 0; flex-shrink: 0;
-  transition: border-color 0.2s, transform 0.2s;
-}
+.fo-thumbs { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+.fo-thumb { border: 2px solid transparent; border-radius: 10px; overflow: hidden; width: 80px; height: 64px; cursor: pointer; background: none; padding: 0; flex-shrink: 0; transition: border-color 0.2s, transform 0.2s; }
 .fo-thumb:hover { transform: translateY(-2px); }
 .fo-thumb-active { border-color: #D86A1C; }
 .fo-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
 
-/* ── ORDER PANEL ── */
-.fo-panel {
-  display: flex; flex-direction: column; gap: 18px;
-  padding-top: 8px;
-}
-.fo-category-pill {
-  display: inline-flex; align-self: flex-start;
-  font-size: 10px; font-weight: 700; letter-spacing: 2px;
-  text-transform: uppercase; color: #D86A1C;
-  background: rgba(216,106,28,0.1); border-radius: 20px;
-  padding: 4px 14px;
-}
-.fo-food-name {
-  font-family: 'Cormorant Garamond', serif;
-  font-size: clamp(32px,4vw,52px);
-  font-weight: 600; line-height: 1.05; color: #1A1208;
-}
+.fo-panel { display: flex; flex-direction: column; gap: 18px; padding-top: 8px; }
+.fo-category-pill { display: inline-flex; align-self: flex-start; font-size: 10px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: #D86A1C; background: rgba(216,106,28,0.1); border-radius: 20px; padding: 4px 14px; }
+.fo-food-name { font-family: 'Cormorant Garamond', serif; font-size: clamp(32px,4vw,52px); font-weight: 600; line-height: 1.05; color: #1A1208; }
 .fo-rating-row { display: flex; align-items: center; gap: 8px; }
 .fo-stars { display: flex; gap: 2px; align-items: center; }
 .fo-rating-val { font-size: 13px; font-weight: 700; color: #1A1208; }
-.fo-rating-ct  { font-size: 12px; color: #9A8570; }
-
+.fo-rating-ct { font-size: 12px; color: #9A8570; }
 .fo-desc { font-size: 14px; color: #6B5B45; line-height: 1.85; max-width: 480px; }
-
-.fo-price-row {
-  display: flex; align-items: center; gap: 16px;
-  padding: 16px 20px;
-  background: #fff;
-  border-radius: 14px;
-  border: 1px solid rgba(216,106,28,0.1);
-  box-shadow: 0 3px 14px rgba(0,0,0,0.05);
-}
-.fo-price-main {
- font-family: Helvetica, sans-serif;
-  font-size: 34px; font-weight: 600; color: #D86A1C;
-}
-.fo-prep-time {
-  display: flex; align-items: center; gap: 5px;
-  font-size: 12px; color: #9A8570; margin-left: auto;
-}
-
-/* Tags */
+.fo-price-row { display: flex; align-items: center; gap: 16px; padding: 16px 20px; background: #fff; border-radius: 14px; border: 1px solid rgba(216,106,28,0.1); box-shadow: 0 3px 14px rgba(0,0,0,0.05); }
+.fo-price-main { font-family: Helvetica, sans-serif; font-size: 34px; font-weight: 600; color: #D86A1C; }
+.fo-prep-time { display: flex; align-items: center; gap: 5px; font-size: 12px; color: #9A8570; margin-left: auto; }
 .fo-tags-row { display: flex; gap: 8px; flex-wrap: wrap; }
-.fo-tag {
-  font-size: 10px; font-weight: 700; letter-spacing: 0.8px;
-  text-transform: uppercase; border-radius: 20px; padding: 4px 12px;
-}
-.fo-tag-gf    { color: #1565C0; background: rgba(21,101,192,0.08); border: 1px solid rgba(21,101,192,0.2); }
+.fo-tag { font-size: 10px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; border-radius: 20px; padding: 4px 12px; }
+.fo-tag-gf { color: #1565C0; background: rgba(21,101,192,0.08); border: 1px solid rgba(21,101,192,0.2); }
 .fo-tag-extra { color: #5D4037; background: rgba(93,64,55,0.08); border: 1px solid rgba(93,64,55,0.2); }
 .fo-tag-vegan { color: #1B5E20; background: rgba(27,94,32,0.1); border: 1px solid rgba(27,94,32,0.25); }
-.fo-tag-gf2   { color: #2E7D32; background: rgba(46,125,50,0.1); border: 1px solid rgba(46,125,50,0.25); }
-
-/* Spice */
+.fo-tag-gf2 { color: #2E7D32; background: rgba(46,125,50,0.1); border: 1px solid rgba(46,125,50,0.25); }
 .fo-spice-row { display: flex; align-items: center; gap: 2px; }
 .fo-spice-label { font-size: 12px; color: #6B5B45; font-weight: 600; margin-left: 8px; }
-
-/* Dietary */
 .fo-dietary-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
-.fo-vegbadge {
-  display: inline-flex; align-items: center; gap: 7px;
-  font-size: 12px; font-weight: 600; border-radius: 20px;
-  padding: 5px 14px; border: 1px solid;
-}
-.fo-vegbadge.fo-veg    { color: #2E7D32; background: rgba(46,125,50,0.08); border-color: rgba(46,125,50,0.3); }
+.fo-vegbadge { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 600; border-radius: 20px; padding: 5px 14px; border: 1px solid; }
+.fo-vegbadge.fo-veg { color: #2E7D32; background: rgba(46,125,50,0.08); border-color: rgba(46,125,50,0.3); }
 .fo-vegbadge.fo-nonveg { color: #D32F2F; background: rgba(211,47,47,0.08); border-color: rgba(211,47,47,0.3); }
 .fo-vegbadge-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
-.fo-vegbadge.fo-veg .fo-vegbadge-dot    { background: #4CAF50; }
+.fo-vegbadge.fo-veg .fo-vegbadge-dot { background: #4CAF50; }
 .fo-vegbadge.fo-nonveg .fo-vegbadge-dot { background: #D32F2F; }
-
-/* ── VEGDOT (small, for suggested cards) ── */
-.fo-vegdot {
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 20px; height: 20px; border-radius: 4px;
-  background: rgba(248,241,234,0.9); backdrop-filter: blur(8px);
-  position: absolute; top: 10px; right: 10px;
-}
-.fo-vegdot.fo-veg    { border: 1.5px solid #4CAF50; }
+.fo-vegdot { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 4px; background: rgba(248,241,234,0.9); backdrop-filter: blur(8px); position: absolute; top: 10px; right: 10px; }
+.fo-vegdot.fo-veg { border: 1.5px solid #4CAF50; }
 .fo-vegdot.fo-nonveg { border: 1.5px solid #D32F2F; }
 .fo-vegdot-inner { width: 9px; height: 9px; border-radius: 50%; }
-.fo-vegdot.fo-veg .fo-vegdot-inner    { background: #4CAF50; }
+.fo-vegdot.fo-veg .fo-vegdot-inner { background: #4CAF50; }
 .fo-vegdot.fo-nonveg .fo-vegdot-inner { background: #D32F2F; }
+.fo-field-label { font-size: 11px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: #9A8570; display: block; }
 
-/* ── FIELD LABEL ── */
-.fo-field-label {
-  font-size: 11px; font-weight: 700; letter-spacing: 1.5px;
-  text-transform: uppercase; color: #9A8570; display: block;
-}
-
-/* ══════════════════════════════════════════
-   PART 2 — VARIANTS / ADDONS / CTA
-══════════════════════════════════════════ */
-.fo-page2 {
-  max-width: 1320px; margin: 0 auto;
-  padding: 0 48px 48px;
-  display: flex; flex-direction: column; gap: 28px;
-}
-
+/* ══ PART 2 — VARIANTS / ADDONS / COUPON / CTA ══ */
+.fo-page2 { max-width: 1320px; margin: 0 auto; padding: 0 48px 48px; display: flex; flex-direction: column; gap: 28px; }
 .fo-section-block { display: flex; flex-direction: column; gap: 14px; }
-
-/* Variants */
 .fo-variants { display: flex; flex-direction: column; gap: 10px; }
-.fo-variant-card {
-  display: flex; align-items: center; gap: 16px;
-  padding: 16px 20px; border-radius: 14px;
-  border: 1.5px solid rgba(216,106,28,0.15);
-  background: #fff; cursor: pointer;
-  transition: border-color 0.2s, box-shadow 0.2s;
-}
+.fo-variant-card { display: flex; align-items: center; gap: 16px; padding: 16px 20px; border-radius: 14px; border: 1.5px solid rgba(216,106,28,0.15); background: #fff; cursor: pointer; transition: border-color 0.2s, box-shadow 0.2s; }
 .fo-variant-card:hover { border-color: #D86A1C; }
-.fo-variant-sel {
-  border-color: #D86A1C;
-  background: rgba(216,106,28,0.04);
-  box-shadow: 0 4px 16px rgba(216,106,28,0.12);
-}
+.fo-variant-sel { border-color: #D86A1C; background: rgba(216,106,28,0.04); box-shadow: 0 4px 16px rgba(216,106,28,0.12); }
 .fo-variant-radio { flex-shrink: 0; }
-.fo-radio {
-  width: 18px; height: 18px; border-radius: 50%;
-  border: 2px solid rgba(216,106,28,0.3);
-  display: inline-flex; align-items: center; justify-content: center;
-  transition: border-color 0.2s;
-}
-.fo-radio-sel {
-  border-color: #D86A1C;
-  background: radial-gradient(circle, #D86A1C 5px, transparent 5px);
-}
+.fo-radio { width: 18px; height: 18px; border-radius: 50%; border: 2px solid rgba(216,106,28,0.3); display: inline-flex; align-items: center; justify-content: center; transition: border-color 0.2s; }
+.fo-radio-sel { border-color: #D86A1C; background: radial-gradient(circle, #D86A1C 5px, transparent 5px); }
 .fo-variant-info { flex: 1; }
 .fo-variant-name { font-size: 14px; font-weight: 700; color: #1A1208; display: block; }
 .fo-variant-serves { font-size: 11px; color: #9A8570; margin-top: 2px; display: block; }
 .fo-variant-price-col { text-align: right; }
-.fo-variant-price {
-  font-family: 'Cormorant Garamond', serif;
-  font-size: 20px; font-weight: 600; color: #1A1208; display: block;
-}
+.fo-variant-price { font-family: 'Cormorant Garamond', serif; font-size: 20px; font-weight: 600; color: #1A1208; display: block; }
 .fo-variant-diff { font-size: 11px; color: #9A8570; }
-
-/* Add-ons grid */
-.fo-addons-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 10px;
-}
-.fo-addon-card {
-  display: flex; align-items: center; gap: 10px;
-  padding: 11px 14px; border-radius: 12px;
-  border: 1.5px solid rgba(216,106,28,0.15);
-  background: #fff; cursor: pointer;
-  transition: border-color 0.2s, background 0.2s;
-}
+.fo-addons-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+.fo-addon-card { display: flex; align-items: center; gap: 10px; padding: 11px 14px; border-radius: 12px; border: 1.5px solid rgba(216,106,28,0.15); background: #fff; cursor: pointer; transition: border-color 0.2s, background 0.2s; }
 .fo-addon-card:hover { border-color: rgba(216,106,28,0.4); }
 .fo-addon-sel { border-color: #D86A1C; background: rgba(216,106,28,0.04); }
 .fo-addon-cb { width: 15px; height: 15px; accent-color: #D86A1C; cursor: pointer; flex-shrink: 0; }
 .fo-addon-img { width: 32px; height: 32px; border-radius: 8px; object-fit: cover; flex-shrink: 0; }
 .fo-addon-name { font-size: 12.5px; color: #1A1208; font-weight: 500; flex: 1; }
 .fo-addon-price { font-size: 12px; color: #D86A1C; font-weight: 700; white-space: nowrap; }
-
-/* Quantity */
 .fo-qty-row { flex-direction: row; align-items: center; gap: 24px; }
-.fo-qty {
-  display: flex; align-items: center;
-  border: 1.5px solid rgba(216,106,28,0.25);
-  border-radius: 10px; overflow: hidden; background: #fff;
-}
-.fo-qty-btn {
-  width: 40px; height: 40px; background: none; border: none;
-  font-size: 13px; color: #D86A1C; cursor: pointer;
-  transition: background 0.2s;
-  display: flex; align-items: center; justify-content: center;
-}
+.fo-qty { display: flex; align-items: center; border: 1.5px solid rgba(216,106,28,0.25); border-radius: 10px; overflow: hidden; background: #fff; }
+.fo-qty-btn { width: 40px; height: 40px; background: none; border: none; font-size: 13px; color: #D86A1C; cursor: pointer; transition: background 0.2s; display: flex; align-items: center; justify-content: center; }
 .fo-qty-btn:hover { background: rgba(216,106,28,0.08); }
-.fo-qty-val {
-  width: 44px; text-align: center; font-size: 15px;
-  font-weight: 700; color: #1A1208;
-  border-left: 1px solid rgba(216,106,28,0.15);
-  border-right: 1px solid rgba(216,106,28,0.15);
-  line-height: 40px;
-}
-
-/* Textarea */
-.fo-textarea {
-  width: 100%; padding: 12px 14px; border-radius: 12px;
-  border: 1.5px solid rgba(216,106,28,0.2); background: #fff;
-  font-family: 'Plus Jakarta Sans', sans-serif; font-size: 13px;
-  color: #1A1208; resize: vertical; outline: none;
-  transition: border-color 0.2s;
-}
+.fo-qty-val { width: 44px; text-align: center; font-size: 15px; font-weight: 700; color: #1A1208; border-left: 1px solid rgba(216,106,28,0.15); border-right: 1px solid rgba(216,106,28,0.15); line-height: 40px; }
+.fo-textarea { width: 100%; padding: 12px 14px; border-radius: 12px; border: 1.5px solid rgba(216,106,28,0.2); background: #fff; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 13px; color: #1A1208; resize: vertical; outline: none; transition: border-color 0.2s; }
 .fo-textarea:focus { border-color: #D86A1C; }
 .fo-textarea::placeholder { color: #C4B09A; }
 
-/* CTA */
-.fo-cta-block {
-  background: #fff; border-radius: 16px;
-  border: 1px solid rgba(216,106,28,0.1);
-  box-shadow: 0 4px 20px rgba(0,0,0,0.06);
-  padding: 20px 24px;
-  display: flex; flex-direction: column; gap: 14px;
+/* ── COUPON ── */
+.fo-coupon-wrap { display: flex; flex-direction: column; gap: 8px; }
+.fo-coupon-row { display: flex; gap: 10px; }
+.fo-coupon-input-wrap {
+  flex: 1; display: flex; align-items: center; gap: 10px;
+  background: #fff; border: 1.5px solid rgba(216,106,28,0.2);
+  border-radius: 12px; padding: 0 14px;
+  transition: border-color 0.2s;
 }
-.fo-total-row { display: flex; align-items: center; justify-content: space-between; }
-.fo-total-label { font-size: 11px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: #9A8570; }
-.fo-total-val {
-  font-family: 'Segoe UI', sans-serif;
-  font-size: 32px; font-weight: 600; color: #2c190b;
+.fo-coupon-input-wrap:focus-within { border-color: #D86A1C; }
+.fo-coupon-input-icon { color: #D86A1C; font-size: 14px; flex-shrink: 0; }
+.fo-coupon-input {
+  flex: 1; border: none; background: transparent; outline: none;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 13px; font-weight: 600; color: #1A1208;
+  letter-spacing: 1px; padding: 12px 0;
 }
-.fo-cta-btns { display: flex; gap: 12px; }
-.fo-btn-primary {
-  flex: 1; padding: 15px;
+.fo-coupon-input::placeholder { color: #C4B09A; font-weight: 400; letter-spacing: 0; }
+.fo-coupon-btn {
+  flex-shrink: 0; padding: 12px 24px;
   background: linear-gradient(135deg,#D86A1C,#F0924A);
-  color: #fff; border: none; border-radius: 50px;
-  font-family: 'Plus Jakarta Sans',sans-serif;
+  color: #fff; border: none; border-radius: 12px;
+  font-family: 'Plus Jakarta Sans', sans-serif;
   font-size: 13px; font-weight: 700; cursor: pointer;
-  letter-spacing: 0.5px;
-  box-shadow: 0 8px 24px rgba(216,106,28,0.35);
-  transition: all 0.25s;
-  display: flex; align-items: center; justify-content: center;
+  transition: all 0.2s; box-shadow: 0 4px 14px rgba(216,106,28,0.3);
+  display: flex; align-items: center; justify-content: center; min-width: 80px;
 }
+.fo-coupon-btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(216,106,28,0.4); }
+.fo-coupon-btn:disabled { opacity: 0.7; cursor: wait; }
+.fo-coupon-spinner {
+  width: 14px; height: 14px; border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff;
+  animation: foSpin 0.7s linear infinite;
+}
+.fo-coupon-error { font-size: 12px; color: #D32F2F; font-weight: 500; display: flex; align-items: center; gap: 6px; }
+
+.fo-coupon-applied {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 18px; border-radius: 12px;
+  background: rgba(46,125,50,0.06);
+  border: 1.5px solid rgba(46,125,50,0.25);
+  gap: 12px;
+}
+.fo-coupon-applied-left { display: flex; align-items: center; gap: 12px; }
+.fo-coupon-applied-icon {
+  width: 36px; height: 36px; border-radius: 10px;
+  background: rgba(46,125,50,0.12); color: #2E7D32;
+  display: flex; align-items: center; justify-content: center; font-size: 15px; flex-shrink: 0;
+}
+.fo-coupon-applied-code { font-size: 13px; font-weight: 700; color: #2E7D32; letter-spacing: 1px; display: block; }
+.fo-coupon-applied-desc { font-size: 11px; color: #6B5B45; display: block; margin-top: 2px; }
+.fo-coupon-applied-right { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+.fo-coupon-savings { font-size: 16px; font-weight: 700; color: #2E7D32; }
+.fo-coupon-remove {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: rgba(211,47,47,0.08); border: 1px solid rgba(211,47,47,0.2);
+  color: #D32F2F; cursor: pointer; font-size: 12px;
+  display: flex; align-items: center; justify-content: center; transition: background 0.2s;
+}
+.fo-coupon-remove:hover { background: rgba(211,47,47,0.15); }
+
+/* ── CTA ── */
+.fo-cta-block { background: #fff; border-radius: 16px; border: 1px solid rgba(216,106,28,0.1); box-shadow: 0 4px 20px rgba(0,0,0,0.06); padding: 20px 24px; display: flex; flex-direction: column; gap: 14px; }
+.fo-total-section { display: flex; flex-direction: column; gap: 8px; }
+.fo-total-row { display: flex; align-items: center; justify-content: space-between; }
+.fo-total-row-sub { opacity: 0.7; }
+.fo-total-row-discount { }
+.fo-total-label { font-size: 11px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: #9A8570; }
+.fo-total-label-sm { font-size: 12px; color: #9A8570; }
+.fo-total-val { font-family: 'Segoe UI', sans-serif; font-size: 32px; font-weight: 600; color: #2c190b; }
+.fo-total-val-sm { font-size: 14px; font-weight: 600; color: #6B5B45; }
+.fo-total-discount-val { font-size: 14px; font-weight: 700; color: #2E7D32; }
+.fo-total-divider { height: 1px; background: rgba(216,106,28,0.1); margin: 4px 0; }
+.fo-total-savings-msg { font-size: 12px; color: #2E7D32; font-weight: 600; display: flex; align-items: center; gap: 6px; background: rgba(46,125,50,0.06); padding: 8px 12px; border-radius: 8px; }
+.fo-cta-btns { display: flex; gap: 12px; }
+.fo-btn-primary { flex: 1; padding: 15px; background: linear-gradient(135deg,#D86A1C,#F0924A); color: #fff; border: none; border-radius: 50px; font-family: 'Plus Jakarta Sans',sans-serif; font-size: 13px; font-weight: 700; cursor: pointer; letter-spacing: 0.5px; box-shadow: 0 8px 24px rgba(216,106,28,0.35); transition: all 0.25s; display: flex; align-items: center; justify-content: center; }
 .fo-btn-primary:hover { transform: translateY(-2px); box-shadow: 0 14px 32px rgba(216,106,28,0.45); }
 .fo-btn-added { background: linear-gradient(135deg,#4CAF50,#66BB6A); box-shadow: 0 8px 24px rgba(76,175,80,0.35); }
-.fo-btn-secondary {
-  flex: 0 0 auto; padding: 15px 28px;
-  background: transparent; color: #D86A1C;
-  border: 1.5px solid #D86A1C; border-radius: 50px;
-  font-family: 'Plus Jakarta Sans',sans-serif;
-  font-size: 13px; font-weight: 700; cursor: pointer;
-  transition: all 0.25s;
-  display: flex; align-items: center; justify-content: center;
-}
+.fo-btn-secondary { flex: 0 0 auto; padding: 15px 28px; background: transparent; color: #D86A1C; border: 1.5px solid #D86A1C; border-radius: 50px; font-family: 'Plus Jakarta Sans',sans-serif; font-size: 13px; font-weight: 700; cursor: pointer; transition: all 0.25s; display: flex; align-items: center; justify-content: center; }
 .fo-btn-secondary:hover { background: #D86A1C; color: #fff; transform: translateY(-2px); }
 
-/* ══════════════════════════════════════════
-   PART 3 — DETAILS + SUGGESTED
-══════════════════════════════════════════ */
-.fo-page3 {
-  max-width: 1320px; margin: 0 auto;
-  padding: 0 48px 80px;
-}
-
+/* ══ PART 3 — DETAILS + SUGGESTED ══ */
+.fo-page3 { max-width: 1320px; margin: 0 auto; padding: 0 48px 80px; }
 .fo-details-header { margin-bottom: 28px; }
-.fo-eyebrow {
-  font-size: 11px; font-weight: 700; letter-spacing: 2.5px;
-  text-transform: uppercase; color: #D86A1C;
-  margin-bottom: 8px; display: flex; align-items: center; gap: 0;
-}
-.fo-section-h2 {
-  font-family: 'Cormorant Garamond', serif;
-  font-size: clamp(28px,3vw,44px); font-weight: 600;
-  line-height: 1.1; color: #1A1208;
-}
+.fo-eyebrow { font-size: 11px; font-weight: 700; letter-spacing: 2.5px; text-transform: uppercase; color: #D86A1C; margin-bottom: 8px; display: flex; align-items: center; gap: 0; }
+.fo-section-h2 { font-family: 'Cormorant Garamond', serif; font-size: clamp(28px,3vw,44px); font-weight: 600; line-height: 1.1; color: #1A1208; }
 .fo-accent { font-style: italic; color: #D86A1C; }
-
-/* Info cards */
-.fo-info-cards {
-  display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  gap: 12px;
-  margin-bottom: 40px;
-}
-.fo-info-card {
-  background: #fff; border-radius: 14px;
-  padding: 18px 16px; border: 1px solid rgba(216,106,28,0.1);
-  box-shadow: 0 3px 12px rgba(0,0,0,0.05);
-  display: flex; flex-direction: column; gap: 8px;
-  transition: transform 0.22s, box-shadow 0.22s;
-}
+.fo-info-cards { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; margin-bottom: 40px; }
+.fo-info-card { background: #fff; border-radius: 14px; padding: 18px 16px; border: 1px solid rgba(216,106,28,0.1); box-shadow: 0 3px 12px rgba(0,0,0,0.05); display: flex; flex-direction: column; gap: 8px; transition: transform 0.22s, box-shadow 0.22s; }
 .fo-info-card:hover { transform: translateY(-3px); box-shadow: 0 10px 28px rgba(216,106,28,0.1); }
 .fo-info-icon { margin-bottom: 2px; }
 .fo-info-key { font-size: 9px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: #D86A1C; }
 .fo-info-val { font-family: 'Cormorant Garamond', serif; font-size: 16px; font-weight: 600; color: #1A1208; }
 .fo-info-green { color: #2E7D32 !important; }
-
-/* Bottom row */
-.fo-bottom-row {
-  display: grid;
-  grid-template-columns: 280px 1fr;
-  gap: 40px;
-  align-items: start;
-}
-
-/* Ingredients */
-.fo-ingredients-block {
-  background: #fff; border-radius: 16px;
-  padding: 24px; border: 1px solid rgba(216,106,28,0.1);
-  box-shadow: 0 3px 14px rgba(0,0,0,0.05);
-}
-.fo-ingredients-text {
-  font-size: 13px; color: #6B5B45; line-height: 1.8; margin-bottom: 16px;
-}
+.fo-bottom-row { display: grid; grid-template-columns: 280px 1fr; gap: 40px; align-items: start; }
+.fo-ingredients-block { background: #fff; border-radius: 16px; padding: 24px; border: 1px solid rgba(216,106,28,0.1); box-shadow: 0 3px 14px rgba(0,0,0,0.05); }
+.fo-ingredients-text { font-size: 13px; color: #6B5B45; line-height: 1.8; margin-bottom: 16px; }
 .fo-ing-img-wrap { border-radius: 12px; overflow: hidden; height: 100px; }
 .fo-ing-img { width: 100%; height: 100%; object-fit: cover; display: block; }
-
-/* Suggested */
 .fo-suggested-block { min-width: 0; }
 .fo-sug-scroll-wrap { position: relative; }
-.fo-sug-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
-  overflow-x: auto;
-  scroll-behavior: smooth;
-  scrollbar-width: none;
-}
+.fo-sug-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; overflow-x: auto; scroll-behavior: smooth; scrollbar-width: none; }
 .fo-sug-grid::-webkit-scrollbar { display: none; }
-
-.fo-sug-card {
-  background: #fff; border-radius: 16px; overflow: hidden;
-  border: 1px solid rgba(216,106,28,0.1);
-  box-shadow: 0 4px 16px rgba(0,0,0,0.07);
-  transition: transform 0.3s, box-shadow 0.3s; cursor: pointer;
-  flex-shrink: 0;
-}
+.fo-sug-card { background: #fff; border-radius: 16px; overflow: hidden; border: 1px solid rgba(216,106,28,0.1); box-shadow: 0 4px 16px rgba(0,0,0,0.07); transition: transform 0.3s, box-shadow 0.3s; cursor: pointer; flex-shrink: 0; }
 .fo-sug-card:hover { transform: translateY(-4px); box-shadow: 0 12px 36px rgba(216,106,28,0.14); }
 .fo-sug-img-wrap { position: relative; height: 150px; overflow: hidden; }
 .fo-sug-img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.5s; display: block; }
@@ -1228,55 +1038,21 @@ export default function FoodOrder({ user, onLogout, cart }) {
 .fo-sug-rating { font-size: 12px; font-weight: 700; color: #6B5B45; }
 .fo-sug-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 2px; }
 .fo-sug-price { font-family: 'Cormorant Garamond', serif; font-size: 17px; font-weight: 600; color: #D86A1C; }
-.fo-sug-add {
-  display: inline-flex; align-items: center; gap: 5px;
-  font-family: 'Plus Jakarta Sans',sans-serif; font-size: 11px; font-weight: 700;
-  color: #D86A1C; background: rgba(216,106,28,0.1); border: none;
-  border-radius: 20px; padding: 5px 14px; cursor: pointer; transition: all 0.2s;
-}
+.fo-sug-add { display: inline-flex; align-items: center; gap: 5px; font-family: 'Plus Jakarta Sans',sans-serif; font-size: 11px; font-weight: 700; color: #D86A1C; background: rgba(216,106,28,0.1); border: none; border-radius: 20px; padding: 5px 14px; cursor: pointer; transition: all 0.2s; }
 .fo-sug-add:hover { background: #D86A1C; color: #fff; }
-
-.fo-sug-arrows {
-  display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px;
-}
-.fo-sug-arrow {
-  width: 32px; height: 32px; border-radius: 50%;
-  border: 1.5px solid rgba(216,106,28,0.3);
-  background: #fff; color: #D86A1C; font-size: 14px;
-  cursor: pointer; display: flex; align-items: center; justify-content: center;
-  transition: background 0.2s, color 0.2s;
-}
+.fo-sug-arrows { display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px; }
+.fo-sug-arrow { width: 32px; height: 32px; border-radius: 50%; border: 1.5px solid rgba(216,106,28,0.3); background: #fff; color: #D86A1C; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.2s, color 0.2s; }
 .fo-sug-arrow:hover { background: #D86A1C; color: #fff; border-color: #D86A1C; }
 
 /* ── FOOTER ── */
-.fo-footer {
-  background: linear-gradient(135deg,#2B1600,#4A2500);
-  padding: 48px;
-}
-.fo-footer-inner {
-  max-width: 1320px; margin: 0 auto;
-  display: flex; flex-direction: column; align-items: center;
-  gap: 18px; text-align: center;
-}
+.fo-footer { background: linear-gradient(135deg,#2B1600,#4A2500); padding: 48px; }
+.fo-footer-inner { max-width: 1320px; margin: 0 auto; display: flex; flex-direction: column; align-items: center; gap: 18px; text-align: center; }
 .fo-footer-brand { display: flex; flex-direction: column; align-items: center; gap: 8px; }
-.fo-logo-nk {
-  font-family: 'Cormorant Garamond', serif; font-size: 18px;
-  font-weight: 600; color: #D86A1C;
-  border: 1.5px solid #D86A1C; border-radius: 6px; padding: 2px 8px;
-}
-.fo-logo-text {
-  font-family: 'Cormorant Garamond', serif; font-size: 18px;
-  font-weight: 600; color: #F8F1EA; letter-spacing: 0.3px;
-}
-.fo-footer-tagline {
-  font-family: 'Cormorant Garamond', serif; font-size: 13px;
-  font-style: italic; color: rgba(248,241,234,0.5);
-}
+.fo-logo-nk { font-family: 'Cormorant Garamond', serif; font-size: 18px; font-weight: 600; color: #D86A1C; border: 1.5px solid #D86A1C; border-radius: 6px; padding: 2px 8px; }
+.fo-logo-text { font-family: 'Cormorant Garamond', serif; font-size: 18px; font-weight: 600; color: #F8F1EA; letter-spacing: 0.3px; }
+.fo-footer-tagline { font-family: 'Cormorant Garamond', serif; font-size: 13px; font-style: italic; color: rgba(248,241,234,0.5); }
 .fo-footer-links { display: flex; gap: 24px; flex-wrap: wrap; justify-content: center; }
-.fo-footer-link {
-  font-size: 12px; color: rgba(248,241,234,0.5);
-  text-decoration: none; transition: color 0.2s;
-}
+.fo-footer-link { font-size: 12px; color: rgba(248,241,234,0.5); text-decoration: none; transition: color 0.2s; }
 .fo-footer-link:hover { color: #F0924A; }
 .fo-footer-copy { font-size: 11px; color: rgba(248,241,234,0.28); }
 
@@ -1303,6 +1079,8 @@ export default function FoodOrder({ user, onLogout, cart }) {
   .fo-cta-btns { flex-direction: column; }
   .fo-btn-secondary { width: 100%; text-align: center; }
   .fo-addons-grid { grid-template-columns: 1fr; }
+  .fo-coupon-row { flex-direction: column; }
+  .fo-coupon-btn { width: 100%; }
 }
 @media (max-width: 480px) {
   .fo-info-cards { grid-template-columns: repeat(2, 1fr); }
