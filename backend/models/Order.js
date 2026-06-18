@@ -12,6 +12,12 @@ const orderSchema = new mongoose.Schema({
     paymentMethod:       { type: String, default: 'Cash' },
     baseAmount:          { type: Number, required: true },
     addonTotal:          { type: Number, default: 0 },
+    addonTotal:          { type: Number, default: 0 },
+    couponCode:          { type: String, default: null },
+    discountType:        { type: String, enum: ['Percentage', 'Flat', 'None'], default: 'None' },
+    discountValue:       { type: Number, default: 0 },   // 15 (%) or 100 (₹) — whatever the coupon defines
+    discountAmount:      { type: Number, default: 0 },   // actual ₹ saved on this order
+    gstAmount:           { type: Number, default: 0 },
     gstAmount:           { type: Number, default: 0 },
     totalAmount:         { type: Number, required: true },
     discountApplied:     { type: String, default: 'None' },

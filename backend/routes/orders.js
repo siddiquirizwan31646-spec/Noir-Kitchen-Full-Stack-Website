@@ -1,11 +1,12 @@
 const express = require('express');
 const router  = express.Router();
 const Order   = require('../models/Order');
+const Coupon  = require('../models/Coupon');
 
 // POST /api/orders — place a new order
 router.post('/', async (req, res) => {
     try {
-        const { latitude, longitude, deliveryAddress, itemName, fullName, mobile, baseAmount, totalAmount, quantity } = req.body;
+        const { latitude, longitude, deliveryAddress, couponCode } = req.body;
 
         // Validate required GPS fields
         if (latitude == null || longitude == null) {
@@ -21,8 +22,20 @@ router.post('/', async (req, res) => {
             });
         }
 
+        const orderData = { ...req.body };
+
+        // Pull authoritative discount type/value from the Coupon collection
+        if (couponCode) {
+            const coupon = await Coupon.findOne({ code: couponCode.toUpperCase() });
+            if (coupon) {
+                orderData.discountType  = coupon.discountType;  // "Percentage" | "Flat"
+                orderData.discountValue = coupon.discountValue; // 15 or 100
+            }
+        }
+        if (!orderData.discountType) orderData.discountType = 'None';
+
         // Use new + save so pre('save') hook always runs
-        const order = new Order(req.body);
+        const order = new Order(orderData);
         await order.save();
 
         res.status(201).json({
