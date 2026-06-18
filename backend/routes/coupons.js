@@ -163,10 +163,14 @@ router.post(
 router.post(
   "/redeem",
   asyncHandler(async (req, res) => {
-    const { code } = req.body;
+    const { code, customerId } = req.body;
+
+    const update = { $inc: { usedCount: 1 } };
+    if (customerId) update.$push = { usedCustomers: customerId };
+
     const coupon = await Coupon.findOneAndUpdate(
       { code: code?.toUpperCase() },
-      { $inc: { usedCount: 1 } },
+      update,
       { new: true }
     );
     if (!coupon) return res.status(404).json({ message: "Coupon not found" });
