@@ -412,6 +412,13 @@ export default function OrderFoodForm({ user: propUser, onLogout, cart }) {
             if (json.success || json.orderId || json._id) {
                 setOrderId(json.orderId || json._id || "NK" + Date.now());
                 setSubmitted(true);
+                if (appliedCoupon?.code) {
+                    fetch(`${API_BASE}/api/coupons/redeem`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ code: appliedCoupon.code }),
+                    }).catch(() => {});
+                }
                 window.scrollTo({ top: 0, behavior: "smooth" });
             } else {
                 throw new Error(json.message || "Order failed");

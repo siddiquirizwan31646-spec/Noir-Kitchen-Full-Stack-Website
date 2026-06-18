@@ -101,7 +101,8 @@ router.patch(
 router.post(
   "/validate",
   asyncHandler(async (req, res) => {
-    const { code, orderTotal } = req.body;
+    const { code } = req.body;
+    const orderTotal = Number(req.body.orderTotal ?? req.body.orderAmount ?? 0);
 
     if (!code) {
       return res.status(400).json({ valid: false, message: "No coupon code provided." });
@@ -128,7 +129,6 @@ router.post(
       });
     }
 
-    /* calculate discount */
     let discountAmount = 0;
     if (coupon.discountType === "Percentage") {
       discountAmount = (orderTotal * coupon.discountValue) / 100;
@@ -136,16 +136,20 @@ router.post(
         discountAmount = coupon.maxDiscount;
       }
     } else {
-      // Flat
       discountAmount = coupon.discountValue;
     }
-
-    // never discount more than the order total
     discountAmount = Math.min(discountAmount, orderTotal);
 
     res.json({
       valid: true,
       discountAmount: Math.round(discountAmount * 100) / 100,
+      coupon: {
+        code: coupon.code,
+        discountType: coupon.discountType,
+        discountValue: coupon.discountValue,
+        maxDiscount: coupon.maxDiscount,
+        minOrderAmount: coupon.minOrderAmount,
+      },
       couponId: coupon._id,
       message: `Coupon applied! You save ₹${discountAmount.toFixed(2)}.`,
     });
