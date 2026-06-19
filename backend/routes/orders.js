@@ -2,7 +2,7 @@ const express = require('express');
 const router  = express.Router();
 const Order   = require('../models/Order');
 const Coupon  = require('../models/Coupon');
-const authMiddleware = require('../middleware/auth');
+const { protect } = require('../middleware/auth');
 
 // POST /api/orders — place a new order
 router.post('/', async (req, res) => {
@@ -73,7 +73,7 @@ router.get('/nearby', async (req, res) => {
 });
 
 // GET /api/orders/my-orders — must be before /:id
-router.get('/my-orders', authMiddleware, async (req, res) => {
+router.get('/my-orders', protect, async (req, res) => {
     try {
         const orders = await Order.find({ customerId: req.user._id })
             .sort({ orderDateTime: -1 })
@@ -95,7 +95,7 @@ router.get('/', async (req, res) => {
 });
 
 // GET /api/orders/:id — single order with delivery agent
-router.get('/:id', authMiddleware, async (req, res) => {
+router.get('/:id', protect, async (req, res) => {
     try {
         const order = await Order.findById(req.params.id)
             .populate('deliveryPartner', 'name mobile');
