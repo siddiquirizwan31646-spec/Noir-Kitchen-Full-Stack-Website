@@ -80,7 +80,29 @@ router.get('/', async (req, res) => {
         res.status(500).json({ success: false, message: err.message });
     }
 });
+// GET /api/orders/my-orders  → all orders for token user
+router.get("/my-orders", authMiddleware, async (req, res) => {
+  try {
+    const orders = await Order.find({ customerId: req.user._id })
+      .sort({ orderDateTime: -1 })
+      .populate("deliveryPartner", "name mobile");
+    res.json({ success: true, orders });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
 
+// GET /api/orders/:id  → single order
+router.get("/:id", authMiddleware, async (req, res) => {
+  try {
+    const order = await Order.findById(req.params.id)
+      .populate("deliveryPartner", "name mobile");
+    if (!order) return res.status(404).json({ success: false, message: "Not found" });
+    res.json({ success: true, order });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
 router.get('/:id', async (req, res) => {
     try {
         const order = await Order.findById(req.params.id);

@@ -22,6 +22,7 @@ import SignatureDishes from "./Pages/SignatureDishes";
 import ReserveTable from "./Pages/ReserveTable";
 import CartCheckout from "./Pages/CartCheckout";
 import ElegantPage from "./Pages/Elegantambience";
+import UserOrders from "./pages/Userorders";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
@@ -105,7 +106,7 @@ function AppRoutes() {
       method: "POST",
       credentials: "include",
       headers: { Authorization: `Bearer ${token}` },
-    }).catch(() => {});
+    }).catch(() => { });
   };
 
   if (checking) {
@@ -322,7 +323,8 @@ function AppRoutes() {
           </PrivateRoute>
         }
       />
-
+      <Route path="/user/:token" element={<UserOrders />} />
+      <Route path="/user/:token/:orderId" element={<UserOrders />} />
       <Route
         path="/profile"
         element={
