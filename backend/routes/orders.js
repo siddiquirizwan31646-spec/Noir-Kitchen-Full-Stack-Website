@@ -2,13 +2,13 @@ const express = require('express');
 const router  = express.Router();
 const Order   = require('../models/Order');
 const Coupon  = require('../models/Coupon');
+const authMiddleware = require('../middleware/authMiddleware');
 
 // POST /api/orders — place a new order
 router.post('/', async (req, res) => {
     try {
         const { latitude, longitude, deliveryAddress, couponCode } = req.body;
 
-        // Validate required GPS fields
         if (latitude == null || longitude == null) {
             return res.status(400).json({
                 success: false,
@@ -24,34 +24,34 @@ router.post('/', async (req, res) => {
 
         const orderData = { ...req.body };
 
-        // Pull authoritative discount type/value from the Coupon collection
         if (couponCode) {
             const coupon = await Coupon.findOne({ code: couponCode.toUpperCase() });
             if (coupon) {
-                orderData.discountType  = coupon.discountType;  // "Percentage" | "Flat"
-                orderData.discountValue = coupon.discountValue; // 15 or 100
+                orderData.discountType  = coupon.discountType;
+                orderData.discountValue = coupon.discountValue;
             }
         }
         if (!orderData.discountType) orderData.discountType = 'None';
 
-        // Use new + save so pre('save') hook always runs
         const otp = Math.floor(100000 + Math.random() * 900000).toString();
-orderData.deliveryOtp = otp;
+        orderData.deliveryOtp = otp;
 
-const order = new Order(orderData);
-await order.save();;
+        const order = new Order(orderData);
+        await order.save();
 
         res.status(201).json({
-    success: true,
-    orderId: order._id,
-    deliveryOtp: otp,
-    message: 'Order placed successfully',
-});
+            success: true,
+            orderId: order._id,
+            deliveryOtp: otp,
+            message: 'Order placed successfully',
+        });
     } catch (err) {
         console.error('Order error:', err.message);
         res.status(400).json({ success: false, message: err.message });
     }
 });
+
+// GET /api/orders/nearby
 router.get('/nearby', async (req, res) => {
     try {
         const { lat, lng, radius = 5000 } = req.query;
@@ -72,6 +72,19 @@ router.get('/nearby', async (req, res) => {
     }
 });
 
+// GET /api/orders/my-orders — must be before /:id
+router.get('/my-orders', authMiddleware, async (req, res) => {
+    try {
+        const orders = await Order.find({ customerId: req.user._id })
+            .sort({ orderDateTime: -1 })
+            .populate('deliveryPartner', 'name mobile');
+        res.json({ success: true, orders });
+    } catch (e) {
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+// GET /api/orders — all orders (admin)
 router.get('/', async (req, res) => {
     try {
         const orders = await Order.find().sort({ createdAt: -1 });
@@ -80,36 +93,17 @@ router.get('/', async (req, res) => {
         res.status(500).json({ success: false, message: err.message });
     }
 });
-// GET /api/orders/my-orders  → all orders for token user
-router.get("/my-orders", authMiddleware, async (req, res) => {
-  try {
-    const orders = await Order.find({ customerId: req.user._id })
-      .sort({ orderDateTime: -1 })
-      .populate("deliveryPartner", "name mobile");
-    res.json({ success: true, orders });
-  } catch (e) {
-    res.status(500).json({ success: false, message: e.message });
-  }
-});
 
-// GET /api/orders/:id  → single order
-router.get("/:id", authMiddleware, async (req, res) => {
-  try {
-    const order = await Order.findById(req.params.id)
-      .populate("deliveryPartner", "name mobile");
-    if (!order) return res.status(404).json({ success: false, message: "Not found" });
-    res.json({ success: true, order });
-  } catch (e) {
-    res.status(500).json({ success: false, message: e.message });
-  }
-});
-router.get('/:id', async (req, res) => {
+// GET /api/orders/:id — single order with delivery agent
+router.get('/:id', authMiddleware, async (req, res) => {
     try {
-        const order = await Order.findById(req.params.id);
+        const order = await Order.findById(req.params.id)
+            .populate('deliveryPartner', 'name mobile');
         if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
-        res.json({ success: true, data: order });
+        res.json({ success: true, order });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
     }
 });
+
 module.exports = router;
