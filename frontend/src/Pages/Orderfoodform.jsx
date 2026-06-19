@@ -223,7 +223,7 @@ export default function OrderFoodForm({ user: propUser, onLogout, cart }) {
     const user            = propUser || { name: customerName || "Guest", email: "" };
     const decodedFood     = decodeURIComponent(foodName || "");
     const decodedPrice    = decodeURIComponent(price || "0");
-
+    const [deliveryOtp, setDeliveryOtp] = useState(null);
     const [item, setItem]             = useState(null);
     const [loading, setLoading]       = useState(true);
     const [submitting, setSubmitting] = useState(false);
@@ -410,8 +410,9 @@ export default function OrderFoodForm({ user: propUser, onLogout, cart }) {
             });
             const json = await res.json();
             if (json.success || json.orderId || json._id) {
-                setOrderId(json.orderId || json._id || "NK" + Date.now());
-                setSubmitted(true);
+    setDeliveryOtp(json.deliveryOtp);
+    setOrderId(json.orderId || json._id || "NK" + Date.now());
+    setSubmitted(true);
                 if (appliedCoupon?.code) {
     fetch(`${API_BASE}/api/coupons/redeem`, {
         method: "POST",
@@ -419,6 +420,7 @@ export default function OrderFoodForm({ user: propUser, onLogout, cart }) {
         body: JSON.stringify({
             code: appliedCoupon.code,
             customerId: user?._id || user?.id || null,
+            
         }),
     }).catch(() => {});
 }
@@ -451,12 +453,19 @@ export default function OrderFoodForm({ user: propUser, onLogout, cart }) {
                         <h2 className="off-success-title">Order Placed!</h2>
                         <p className="off-success-sub">Your order has been received. We'll start preparing it right away.</p>
                         {orderId && (
-                            <div className="off-order-id-wrap">
-                                <span className="off-order-id-label">Order ID</span>
-                                <span className="off-order-id-val">#{String(orderId).slice(-8).toUpperCase()}</span>
-                            </div>
-                        )}
-                        <div className="off-success-details">
+    <div className="off-order-id-wrap">
+        <span className="off-order-id-label">Order ID</span>
+        <span className="off-order-id-val">#{String(orderId).slice(-8).toUpperCase()}</span>
+    </div>
+)}
+{deliveryOtp && (
+    <div className="off-otp-wrap">
+        <span className="off-otp-label">Delivery OTP</span>
+        <span className="off-otp-val">{deliveryOtp}</span>
+        <p className="off-otp-hint">Share this with the delivery agent on arrival</p>
+    </div>
+)}
+<div className="off-success-details">
                             <div className="off-suc-row"><span>Item</span><strong>{decodedFood}</strong></div>
                             {couponDiscount > 0 && (
                                 <div className="off-suc-row">
@@ -699,7 +708,10 @@ const STYLES = `
 .off-root { font-family: 'Plus Jakarta Sans', sans-serif; min-height: 100vh; background: #F8F1EA; color: #1A1208; overflow-x: hidden; }
 .off-spinner { width: 38px; height: 38px; border-radius: 50%; border: 3px solid rgba(216,106,28,0.15); border-top-color: #D86A1C; animation: offSpin 0.8s linear infinite; }
 @keyframes offSpin { to { transform: rotate(360deg); } }
-
+.off-otp-wrap { background: rgba(216,106,28,0.06); border: 1.5px dashed rgba(216,106,28,0.35); border-radius: 14px; padding: 16px 24px; margin-bottom: 20px; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.off-otp-label { font-size: 10px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: #9A8570; }
+.off-otp-val { font-family: 'Cormorant Garamond', serif; font-size: 42px; font-weight: 600; color: #D86A1C; letter-spacing: 8px; }
+.off-otp-hint { font-size: 11px; color: #9A8570; margin-top: 2px; }
 .off-hero { background: linear-gradient(135deg,#2B1600,#4A2500); padding: 52px 48px 48px; text-align: center; }
 .off-hero-inner { max-width: 680px; margin: 0 auto; }
 .off-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: 2.5px; text-transform: uppercase; color: #F0924A; display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 16px; }

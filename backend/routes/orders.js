@@ -35,14 +35,18 @@ router.post('/', async (req, res) => {
         if (!orderData.discountType) orderData.discountType = 'None';
 
         // Use new + save so pre('save') hook always runs
-        const order = new Order(orderData);
-        await order.save();
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+orderData.deliveryOtp = otp;
+
+const order = new Order(orderData);
+await order.save();;
 
         res.status(201).json({
-            success: true,
-            orderId: order._id,
-            message: 'Order placed successfully',
-        });
+    success: true,
+    orderId: order._id,
+    deliveryOtp: otp,
+    message: 'Order placed successfully',
+});
     } catch (err) {
         console.error('Order error:', err.message);
         res.status(400).json({ success: false, message: err.message });

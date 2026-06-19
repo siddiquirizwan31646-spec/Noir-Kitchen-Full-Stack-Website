@@ -25,7 +25,7 @@ const orderSchema = new mongoose.Schema({
     customerId:          { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
     fullName:            { type: String, required: true },
     mobile:              { type: String, required: true },
-
+    deliveryOtp: { type: String, default: null },
     // ── GPS-based delivery location (no manual address fields) ────────────
     deliveryAddress:     { type: String, required: true }, // reverse-geocoded string
     latitude:            { type: Number, required: true },
