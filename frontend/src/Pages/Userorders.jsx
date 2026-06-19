@@ -205,6 +205,19 @@ export default function UserOrders({ user, onLogout, cart }) {
             </div>
           </div>
         )}
+{order.orderStatus === "Delivered" && (
+  <div className="uo-card uo-delivered-card">
+    <div className="uo-delivered-content">
+      <div className="uo-delivered-icon">
+        <FontAwesomeIcon icon={faCheckCircle} />
+      </div>
+      <div>
+        <div className="uo-delivered-title">Order Delivered Successfully!</div>
+        <div className="uo-delivered-sub">We hope you enjoyed your meal 🍽️</div>
+      </div>
+    </div>
+  </div>
+)}
 
         {/* ── Delivery Agent (from assignorders) ── */}
         {!isCancelled && agent && (
@@ -360,12 +373,6 @@ function PageShell({ children, navigate, back, user, onLogout, cart, activeNav, 
     <div className="uo-root">
       <style>{CSS}</style>
       <Navbar user={user} onLogout={onLogout} activeNav={activeNav} setActiveNav={setActiveNav} cart={cart} />
-      <div className="uo-topbar">
-        <button className="uo-back-btn" onClick={back || (() => navigate(-1))}>
-          <FontAwesomeIcon icon={faArrowLeft} />
-        </button>
-        <span className="uo-topbar-title">Noir Kitchen</span>
-      </div>
       <div className="uo-content">{children}</div>
     </div>
   );
@@ -421,6 +428,27 @@ const CSS = `
   font-family: 'Cormorant Garamond', serif;
   font-size: 28px; font-weight: 700; color: #1A1208;
   margin-bottom: 20px;
+}
+/* ── DELIVERED BANNER ── */
+.uo-delivered-card {
+  border-color: rgba(22,163,74,0.25);
+  background: linear-gradient(135deg, #F0FDF4, #DCFCE7);
+}
+.uo-delivered-content {
+  display: flex; align-items: center; gap: 14px;
+}
+.uo-delivered-icon {
+  width: 48px; height: 48px; border-radius: 50%;
+  background: linear-gradient(135deg, #16A34A, #22C55E);
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-size: 22px; flex-shrink: 0;
+  box-shadow: 0 4px 14px rgba(22,163,74,0.3);
+}
+.uo-delivered-title {
+  font-size: 15px; font-weight: 700; color: #15803D;
+}
+.uo-delivered-sub {
+  font-size: 12px; color: #4ADE80; margin-top: 3px; color: #16A34A; opacity: 0.8;
 }
 .uo-order-card {
   background: #fff; border: 1px solid rgba(196,81,10,0.12);
