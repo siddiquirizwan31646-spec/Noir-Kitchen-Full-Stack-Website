@@ -15,7 +15,9 @@ import {
   faChevronRight,
   faTag,
   faUtensils,
+  faTimesCircle,
 } from "@fortawesome/free-solid-svg-icons";
+import Navbar from "../component/ui/Navbar";
 
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
@@ -45,7 +47,7 @@ function fmtPrice(n) {
   return "₹" + Number(n || 0).toLocaleString("en-IN");
 }
 
-export default function UserOrders() {
+export default function UserOrders({ user, onLogout, cart }) {
   const { token, orderId } = useParams();
   const navigate = useNavigate();
 
@@ -53,6 +55,7 @@ export default function UserOrders() {
   const [order, setOrder]       = useState(null);
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState("");
+  const [activeNav, setActiveNav] = useState("Orders");
 
   /* ── fetch all orders ── */
   useEffect(() => {
@@ -70,7 +73,7 @@ export default function UserOrders() {
       .finally(() => setLoading(false));
   }, [token, orderId]);
 
-  /* ── fetch single order ── */
+  /* ── fetch single order (backend now enriches with assignorders / cancelledOrder) ── */
   useEffect(() => {
     if (!orderId) return;
     setLoading(true);
@@ -112,15 +115,25 @@ export default function UserOrders() {
      ORDER DETAIL VIEW
   ══════════════════════════════════════════ */
   if (orderId) {
-    if (loading) return <PageShell token={token} navigate={navigate}><Spinner /></PageShell>;
-    if (error)   return <PageShell token={token} navigate={navigate}><ErrorMsg msg={error} /></PageShell>;
-    if (!order)  return null;
+    if (loading) return (
+      <PageShell token={token} navigate={navigate} user={user} onLogout={onLogout} cart={cart} activeNav={activeNav} setActiveNav={setActiveNav}>
+        <Spinner />
+      </PageShell>
+    );
+    if (error) return (
+      <PageShell token={token} navigate={navigate} user={user} onLogout={onLogout} cart={cart} activeNav={activeNav} setActiveNav={setActiveNav}>
+        <ErrorMsg msg={error} />
+      </PageShell>
+    );
+    if (!order) return null;
 
-    const stepIdx = statusIndex(order.orderStatus);
-    const agent   = order.deliveryPartner;
+    const stepIdx       = statusIndex(order.orderStatus);
+    const agent          = order.deliveryPartner; // populated from assignorders by backend
+    const isCancelled    = order.orderStatus === "Cancelled";
+    const cancelledInfo  = order.cancelledDetails; // populated from cancelledOrder by backend
 
     return (
-      <PageShell token={token} navigate={navigate} back={() => navigate(`/user/${token}`)}>
+      <PageShell token={token} navigate={navigate} back={() => navigate(`/user/${token}`)} user={user} onLogout={onLogout} cart={cart} activeNav={activeNav} setActiveNav={setActiveNav}>
         <style>{CSS}</style>
 
         {/* ── Header ── */}
@@ -132,8 +145,34 @@ export default function UserOrders() {
           <Badge status={order.orderStatus} />
         </div>
 
+        {/* ── Cancelled Info ── */}
+        {isCancelled && (
+          <div className="uo-card uo-cancel-card">
+            <div className="uo-card-title uo-cancel-title">
+              <FontAwesomeIcon icon={faTimesCircle} /> Order Cancelled
+            </div>
+            <div className="uo-cancel-body">
+              {cancelledInfo?.reason && (
+                <div className="uo-cancel-row">
+                  <span className="uo-cancel-label">Reason</span>
+                  <span className="uo-cancel-val">{cancelledInfo.reason}</span>
+                </div>
+              )}
+              {cancelledInfo?.cancelledAt && (
+                <div className="uo-cancel-row">
+                  <span className="uo-cancel-label">Cancelled On</span>
+                  <span className="uo-cancel-val">{fmtDate(cancelledInfo.cancelledAt)}</span>
+                </div>
+              )}
+              {!cancelledInfo && (
+                <p className="uo-cancel-empty">No further details available for this cancellation.</p>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* ── Status Timeline ── */}
-        {order.orderStatus !== "Cancelled" && (
+        {!isCancelled && (
           <div className="uo-card">
             <div className="uo-card-title">
               <FontAwesomeIcon icon={faClock} className="uo-icon-accent" /> Track Order
@@ -167,8 +206,8 @@ export default function UserOrders() {
           </div>
         )}
 
-        {/* ── Delivery Agent ── */}
-        {agent && (
+        {/* ── Delivery Agent (from assignorders) ── */}
+        {!isCancelled && agent && (
           <div className="uo-card">
             <div className="uo-card-title">
               <FontAwesomeIcon icon={faMotorcycle} className="uo-icon-accent" /> Delivery Agent
@@ -179,10 +218,17 @@ export default function UserOrders() {
               </div>
               <div className="uo-agent-info">
                 <div className="uo-agent-name">{agent.name || "Delivery Partner"}</div>
-                {agent.mobile && <div className="uo-agent-phone">{agent.mobile}</div>}
+                {(agent.phone || agent.mobile) && (
+                  <div className="uo-agent-phone">{agent.phone || agent.mobile}</div>
+                )}
+                {agent.vehicleType && (
+                  <div className="uo-agent-vehicle">
+                    {agent.vehicleType}{agent.vehicleNumber ? ` · ${agent.vehicleNumber}` : ""}
+                  </div>
+                )}
               </div>
-              {agent.mobile && (
-                <a href={`tel:${agent.mobile}`} className="uo-call-btn">
+              {(agent.phone || agent.mobile) && (
+                <a href={`tel:${agent.phone || agent.mobile}`} className="uo-call-btn">
                   <FontAwesomeIcon icon={faPhoneAlt} style={{ marginRight: 6 }} /> Call
                 </a>
               )}
@@ -261,7 +307,7 @@ export default function UserOrders() {
      ORDER LIST VIEW
   ══════════════════════════════════════════ */
   return (
-    <PageShell token={token} navigate={navigate} back={() => navigate(-1)}>
+    <PageShell token={token} navigate={navigate} back={() => navigate(-1)} user={user} onLogout={onLogout} cart={cart} activeNav={activeNav} setActiveNav={setActiveNav}>
       <style>{CSS}</style>
       <div className="uo-list-title">My Orders</div>
 
@@ -309,10 +355,11 @@ export default function UserOrders() {
 }
 
 /* ── Shell wrapper ── */
-function PageShell({ children, token, navigate, back }) {
+function PageShell({ children, navigate, back, user, onLogout, cart, activeNav, setActiveNav }) {
   return (
     <div className="uo-root">
       <style>{CSS}</style>
+      <Navbar user={user} onLogout={onLogout} activeNav={activeNav} setActiveNav={setActiveNav} cart={cart} />
       <div className="uo-topbar">
         <button className="uo-back-btn" onClick={back || (() => navigate(-1))}>
           <FontAwesomeIcon icon={faArrowLeft} />
@@ -416,6 +463,15 @@ const CSS = `
 }
 .uo-icon-accent { color: #C4510A; }
 
+/* ── CANCEL CARD ── */
+.uo-cancel-card { border-color: rgba(220,38,38,0.2); background: #FEF2F2; }
+.uo-cancel-title { color: #DC2626; }
+.uo-cancel-body { display: flex; flex-direction: column; gap: 10px; }
+.uo-cancel-row { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; }
+.uo-cancel-label { color: #9A8570; flex-shrink: 0; }
+.uo-cancel-val { color: #4A3728; text-align: right; font-weight: 600; }
+.uo-cancel-empty { font-size: 13px; color: #9A8570; }
+
 /* ── TIMELINE ── */
 .uo-timeline { display: flex; flex-direction: column; gap: 0; }
 .uo-step { display: flex; gap: 12px; }
@@ -454,6 +510,7 @@ const CSS = `
 .uo-agent-info { flex: 1; min-width: 0; }
 .uo-agent-name { font-size: 14px; font-weight: 700; color: #1A1208; }
 .uo-agent-phone { font-size: 12px; color: #9A8570; margin-top: 2px; }
+.uo-agent-vehicle { font-size: 11px; color: #9A8570; margin-top: 2px; }
 .uo-call-btn {
   display: flex; align-items: center; padding: 8px 16px;
   background: linear-gradient(135deg, #C4510A, #E8763A);

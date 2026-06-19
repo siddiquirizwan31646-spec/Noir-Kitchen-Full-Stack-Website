@@ -3,6 +3,8 @@ const router  = express.Router();
 const Order   = require('../models/Order');
 const Coupon  = require('../models/Coupon');
 const { protect } = require('../middleware/auth');
+const AssignOrder    = require('../models/AssignOrder');   
+const CancelledOrder = require('../models/CancelledOrder');
 
 // POST /api/orders — place a new order
 router.post('/', async (req, res) => {
@@ -69,7 +71,35 @@ router.get('/nearby', async (req, res) => {
         res.status(500).json({ success: false, message: err.message });
     }
 });
+router.get('/:id', protect, async (req, res) => {
+    try {
+        const order = await Order.findById(req.params.id);
+        if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
 
+        const result = order.toObject();
+
+        if (order.orderStatus === 'Cancelled') {
+            const cancelled = await CancelledOrder.findOne({ orderId: order._id });
+            if (cancelled) {
+                result.cancelledDetails = {
+                    reason:      cancelled.reason,
+                    cancelledAt: cancelled.cancelledAt,
+                };
+            }
+        } else {
+            const assigned = await AssignOrder.findOne({ order: order._id });
+            if (assigned) {
+                result.deliveryPartner = assigned.deliveryPartnerDetails; // { name, phone, email, vehicleType, vehicleNumber }
+                result.assignedAt      = assigned.assignedAt;
+                result.deliveryStatus  = assigned.status; // e.g. "Assigned"
+            }
+        }
+
+        res.json({ success: true, order: result });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
 // GET /api/orders/my-orders — must be before /:id
 router.get('/my-orders', protect, async (req, res) => {
     try {
