@@ -702,7 +702,6 @@ export default function OrderFoodForm({ user: propUser, onLogout, cart }) {
         </>
     );
 }
-
 const STYLES = `
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 .off-root { font-family: 'Plus Jakarta Sans', sans-serif; min-height: 100vh; background: #F8F1EA; color: #1A1208; overflow-x: hidden; }

@@ -52,8 +52,6 @@ await order.save();;
         res.status(400).json({ success: false, message: err.message });
     }
 });
-
-// GET /api/orders/nearby?lat=...&lng=...&radius=5000
 router.get('/nearby', async (req, res) => {
     try {
         const { lat, lng, radius = 5000 } = req.query;
@@ -74,7 +72,6 @@ router.get('/nearby', async (req, res) => {
     }
 });
 
-// GET /api/orders — all orders (admin)
 router.get('/', async (req, res) => {
     try {
         const orders = await Order.find().sort({ createdAt: -1 });
@@ -84,7 +81,6 @@ router.get('/', async (req, res) => {
     }
 });
 
-// GET /api/orders/:id — single order
 router.get('/:id', async (req, res) => {
     try {
         const order = await Order.findById(req.params.id);

@@ -26,18 +26,13 @@ const orderSchema = new mongoose.Schema({
     fullName:            { type: String, required: true },
     mobile:              { type: String, required: true },
     deliveryOtp: { type: String, default: null },
-    // ── GPS-based delivery location (no manual address fields) ────────────
     deliveryAddress:     { type: String, required: true }, // reverse-geocoded string
     latitude:            { type: Number, required: true },
     longitude:           { type: Number, required: true },
-
-    // GeoJSON point — kept in sync via pre-save hook for $near queries
     location: {
         type:        { type: String, enum: ['Point'], default: 'Point' },
         coordinates: { type: [Number], default: [0, 0] }, // [longitude, latitude]
     },
-
-    // Legacy address fields — optional, kept for backward compatibility
     houseNo:  { type: String, default: '' },
     areaName: { type: String, default: '' },
     areaNo:   { type: String, default: '' },
@@ -47,9 +42,6 @@ const orderSchema = new mongoose.Schema({
     orderStatus:     { type: String, enum: ['Placed', 'Preparing', 'Out for Delivery', 'Delivered', 'Cancelled'], default: 'Placed' },
     deliveryPartner: { type: String, default: null },
 }, { timestamps: true });
-
-// ── Sync GeoJSON point before save ────────────────────────────────────────
-// models/Order.js  — replace your pre('save') hook with this:
 
 orderSchema.pre('save', function (next) {
     try {
@@ -65,7 +57,6 @@ orderSchema.pre('save', function (next) {
     }
 });
 
-// ── Also sync on Order.create() which uses insertMany internally ──────────
 orderSchema.pre('insertMany', function (next, docs) {
     if (Array.isArray(docs)) {
         docs.forEach(doc => {
@@ -79,7 +70,5 @@ orderSchema.pre('insertMany', function (next, docs) {
     }
     next();
 });
-
 orderSchema.index({ location: '2dsphere' });
-
 module.exports = mongoose.model('Order', orderSchema);
