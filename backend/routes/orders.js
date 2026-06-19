@@ -71,6 +71,16 @@ router.get('/nearby', async (req, res) => {
         res.status(500).json({ success: false, message: err.message });
     }
 });
+router.get('/my-orders', protect, async (req, res) => {
+    try {
+        const orders = await Order.find({ customerId: req.user._id })
+            .sort({ orderDateTime: -1 })
+            .populate('deliveryPartner', 'name mobile');
+        res.json({ success: true, orders });
+    } catch (e) {
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
 router.get('/:id', protect, async (req, res) => {
     try {
         const order = await Order.findById(req.params.id);
@@ -98,17 +108,6 @@ router.get('/:id', protect, async (req, res) => {
         res.json({ success: true, order: result });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
-    }
-});
-// GET /api/orders/my-orders — must be before /:id
-router.get('/my-orders', protect, async (req, res) => {
-    try {
-        const orders = await Order.find({ customerId: req.user._id })
-            .sort({ orderDateTime: -1 })
-            .populate('deliveryPartner', 'name mobile');
-        res.json({ success: true, orders });
-    } catch (e) {
-        res.status(500).json({ success: false, message: e.message });
     }
 });
 

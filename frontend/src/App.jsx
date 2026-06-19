@@ -323,8 +323,8 @@ function AppRoutes() {
           </PrivateRoute>
         }
       />
-      <Route path="/user/:token" element={<UserOrders />} />
-      <Route path="/user/:token/:orderId" element={<UserOrders />} />
+      <Route path="/user/:token" element={<UserOrders user={user} onLogout={handleLogout} cart={cart} />} />
+<Route path="/user/:token/:orderId" element={<UserOrders user={user} onLogout={handleLogout} cart={cart} />} />
       <Route
         path="/profile"
         element={
