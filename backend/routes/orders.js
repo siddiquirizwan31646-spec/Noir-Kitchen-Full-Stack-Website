@@ -50,8 +50,6 @@ router.post('/', async (req, res) => {
         res.status(400).json({ success: false, message: err.message });
     }
 });
-
-// GET /api/orders/nearby
 router.get('/nearby', async (req, res) => {
     try {
         const { lat, lng, radius = 5000 } = req.query;
