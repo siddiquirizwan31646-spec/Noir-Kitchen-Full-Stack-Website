@@ -22,7 +22,7 @@ import SignatureDishes from "./Pages/SignatureDishes";
 import ReserveTable from "./Pages/ReserveTable";
 import CartCheckout from "./Pages/CartCheckout";
 import ElegantPage from "./Pages/Elegantambience";
-import UserOrders from "./pages/Userorders";
+import UserOrders from "./Pages/Userorders"
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
