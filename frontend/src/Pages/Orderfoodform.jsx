@@ -731,7 +731,6 @@ const STYLES = `
 .off-veg { border: 1.5px solid #4CAF50; } .off-nonveg { border: 1.5px solid #D32F2F; }
 .off-veg-circle { width: 9px; height: 9px; border-radius: 50%; }
 .off-veg .off-veg-circle { background: #4CAF50; } .off-nonveg .off-veg-circle { background: #D32F2F; }
-
 .off-section { background: #fff; border-radius: 20px; border: 1px solid rgba(216,106,28,0.1); box-shadow: 0 4px 20px rgba(0,0,0,0.06); padding: 24px; margin-bottom: 20px; }
 .off-section-hd { display: flex; align-items: flex-start; gap: 14px; padding-bottom: 18px; margin-bottom: 20px; border-bottom: 1px solid rgba(216,106,28,0.1); }
 .off-section-icon { font-size: 22px; line-height: 1; flex-shrink: 0; margin-top: 2px; }

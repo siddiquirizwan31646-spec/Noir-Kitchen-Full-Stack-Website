@@ -56,7 +56,6 @@ orderSchema.pre('save', function (next) {
         if (typeof next === 'function') next(err);
     }
 });
-
 orderSchema.pre('insertMany', function (next, docs) {
     if (Array.isArray(docs)) {
         docs.forEach(doc => {
