@@ -27,7 +27,8 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
 gsap.registerPlugin(ScrollTrigger);
-// Add this helper at the top of the file (outside components)
+gsap.config({ force3D: true });
+ScrollTrigger.config({ ignoreMobileResize: true });
 function isWebGLAvailable() {
   try {
     const canvas = document.createElement("canvas");
@@ -44,25 +45,25 @@ function isWebGLAvailable() {
 ═══════════════════════════════════════════════════════════════ */
 
 const STORY_ICONS = [
-  { icon: faLeaf,  title: "Fresh & Quality\nIngredients", sub: "Locally sourced\nand premium quality" },
-  { icon: faCrown, title: "Meet Our\nStaff",              sub: "Passionate chefs\nwith creativity" },
-  { icon: faMedal, title: "Elegant\nAmbience",            sub: "A perfect blend of\ncomfort & style" },
-  { icon: faStar,  title: "Unforgettable\nExperience",    sub: "Moments that stay\nwith you forever" },
+  { icon: faLeaf, title: "Fresh & Quality\nIngredients", sub: "Locally sourced\nand premium quality" },
+  { icon: faCrown, title: "Meet Our\nStaff", sub: "Passionate chefs\nwith creativity" },
+  { icon: faMedal, title: "Elegant\nAmbience", sub: "A perfect blend of\ncomfort & style" },
+  { icon: faStar, title: "Unforgettable\nExperience", sub: "Moments that stay\nwith you forever" },
 ];
 
 const CATEGORIES = [
-  { label: "Starters",    img: "https://images.unsplash.com/photo-1541014741259-de529411b96a?w=200&q=80" },
+  { label: "Starters", img: "https://images.unsplash.com/photo-1541014741259-de529411b96a?w=200&q=80" },
   { label: "Main Course", img: "https://images.unsplash.com/photo-1432139555190-58524dae6a55?w=200&q=80" },
-  { label: "Pastas",      img: "https://images.unsplash.com/photo-1563379926898-05f4575a45d8?w=200&q=80" },
-  { label: "Desserts",    img: "https://images.unsplash.com/photo-1565958011703-44f9829ba187?w=200&q=80" },
-  { label: "Beverages",   img: "https://images.unsplash.com/photo-1544145945-f90425340c7e?w=200&q=80" },
+  { label: "Pastas", img: "https://images.unsplash.com/photo-1563379926898-05f4575a45d8?w=200&q=80" },
+  { label: "Desserts", img: "https://images.unsplash.com/photo-1565958011703-44f9829ba187?w=200&q=80" },
+  { label: "Beverages", img: "https://images.unsplash.com/photo-1544145945-f90425340c7e?w=200&q=80" },
 ];
 
 const FOOTER_ITEMS = [
-  { icon: faPhone,       title: "Call Us",       sub: "+91 45451 45455" },
-  { icon: faClock,       title: "Open Hours",    sub: "Mon - Sun: 11 AM – 11 PM" },
-  { icon: faLocationDot, title: "Our Location",  sub: "Jaipur, Rajasthan, India" },
-  { icon: faMotorcycle,  title: "Fast Delivery", sub: "Order at your Doorstep" },
+  { icon: faPhone, title: "Call Us", sub: "+91 45451 45455" },
+  { icon: faClock, title: "Open Hours", sub: "Mon - Sun: 11 AM – 11 PM" },
+  { icon: faLocationDot, title: "Our Location", sub: "Jaipur, Rajasthan, India" },
+  { icon: faMotorcycle, title: "Fast Delivery", sub: "Order at your Doorstep" },
 ];
 
 /* ═══════════════════════════════════════════════════════════════
@@ -72,26 +73,26 @@ const FOOTER_ITEMS = [
 class CanvasErrorBoundary extends Component {
   constructor(props) { super(props); this.state = { error: false }; }
   static getDerivedStateFromError() { return { error: true }; }
- // Replace your CanvasErrorBoundary render with a nicer fallback:
-render() {
-  if (this.state.error) return (
-    <div style={{ 
-      width:"100%", height:"100%", 
-      display:"flex", alignItems:"center", justifyContent:"center"
-    }}>
-      <img 
-        src="/Home/Bowl-preview.webp" 
-        alt="Noir Kitchen Bowl"
-        style={{ 
-          width:"80%", maxWidth:400,
-          animation:"floatDot 3s ease-in-out infinite",
-          filter:"drop-shadow(0 20px 40px rgba(196,81,10,0.3))"
-        }}
-      />
-    </div>
-  );
-  return this.props.children;
-}
+  // Replace your CanvasErrorBoundary render with a nicer fallback:
+  render() {
+    if (this.state.error) return (
+      <div style={{
+        width: "100%", height: "100%",
+        display: "flex", alignItems: "center", justifyContent: "center"
+      }}>
+        <img
+          src="/Home/Bowl-preview.webp"
+          alt="Noir Kitchen Bowl"
+          style={{
+            width: "80%", maxWidth: 400,
+            animation: "floatDot 3s ease-in-out infinite",
+            filter: "drop-shadow(0 20px 40px rgba(196,81,10,0.3))"
+          }}
+        />
+      </div>
+    );
+    return this.props.children;
+  }
 }
 
 function Bowl1() {
@@ -124,16 +125,16 @@ const P1_ELS = [
 function bounceIn(els, dir = "down") {
   const yFrom = dir === "down" ? -30 : 30;
   return gsap.timeline({ defaults: { ease: "back.out(1.7)", duration: 0.55 } })
-    .fromTo(els[0], { opacity:0 }, { opacity:1, duration:0.6, ease:"power2.out" })
-    .fromTo(els[1], { y:yFrom*2, opacity:0 }, { y:0, opacity:1, duration:0.5 }, "-=0.35")
-    .fromTo(els[2], { scale:0.5, opacity:0 }, { scale:1, opacity:1, duration:0.42 }, "-=0.28")
-    .fromTo(els[3], { y:yFrom, opacity:0 }, { y:0, opacity:1, stagger:0.06, duration:0.38 }, "-=0.22")
-    .fromTo(els[4], { scale:0.4, opacity:0 }, { scale:1, opacity:1, stagger:0.08, duration:0.38 }, "-=0.18")
-    .fromTo(els[5], { scale:0.6, opacity:0 }, { scale:1, opacity:1, duration:0.38 }, "-=0.28")
-    .fromTo(els[6], { y:yFrom, opacity:0 }, { y:0, opacity:1, stagger:0.09, duration:0.45 }, "-=0.28")
-    .fromTo(els[7], { y:yFrom*0.6, opacity:0 }, { y:0, opacity:1, duration:0.38 }, "-=0.22")
-    .fromTo(els[8], { scale:0.6, opacity:0 }, { scale:1, opacity:1, stagger:0.09, ease:"back.out(2)", duration:0.45 }, "-=0.18")
-    .fromTo(els[9], { y:yFrom, opacity:0, scale:0.8 }, { y:0, opacity:1, scale:1, stagger:0.07, duration:0.45 }, "-=0.18");
+    .fromTo(els[0], { opacity: 0 }, { opacity: 1, duration: 0.6, ease: "power2.out" })
+    .fromTo(els[1], { y: yFrom * 2, opacity: 0 }, { y: 0, opacity: 1, duration: 0.5 }, "-=0.35")
+    .fromTo(els[2], { scale: 0.5, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.42 }, "-=0.28")
+    .fromTo(els[3], { y: yFrom, opacity: 0 }, { y: 0, opacity: 1, stagger: 0.06, duration: 0.38 }, "-=0.22")
+    .fromTo(els[4], { scale: 0.4, opacity: 0 }, { scale: 1, opacity: 1, stagger: 0.08, duration: 0.38 }, "-=0.18")
+    .fromTo(els[5], { scale: 0.6, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.38 }, "-=0.28")
+    .fromTo(els[6], { y: yFrom, opacity: 0 }, { y: 0, opacity: 1, stagger: 0.09, duration: 0.45 }, "-=0.28")
+    .fromTo(els[7], { y: yFrom * 0.6, opacity: 0 }, { y: 0, opacity: 1, duration: 0.38 }, "-=0.22")
+    .fromTo(els[8], { scale: 0.6, opacity: 0 }, { scale: 1, opacity: 1, stagger: 0.09, ease: "back.out(2)", duration: 0.45 }, "-=0.18")
+    .fromTo(els[9], { y: yFrom, opacity: 0, scale: 0.8 }, { y: 0, opacity: 1, scale: 1, stagger: 0.07, duration: 0.45 }, "-=0.18");
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -151,13 +152,13 @@ function useST(ref, animFn) {
 
 function buildFoodPath(item, user) {
   const encode = (s) => encodeURIComponent(String(s ?? "").trim());
-  const foodName     = encode(item.name);
-  const vegType      = encode(item.veg ? "veg" : "non-veg");
-  const price        = encode(item.price);
+  const foodName = encode(item.name);
+  const vegType = encode(item.veg ? "veg" : "non-veg");
+  const price = encode(item.price);
   const customerName = encode(user?.name || "Guest");
-  const username     = encode(user?.username || user?.email?.split("@")[0] || "guest");
-  const addr         = user?.address;
-  const addrStr      = addr
+  const username = encode(user?.username || user?.email?.split("@")[0] || "guest");
+  const addr = user?.address;
+  const addrStr = addr
     ? [addr.houseNo, addr.areaName, addr.areaNo, addr.city, addr.pinCode].filter(Boolean).join(", ")
     : "";
   const addressParam = addrStr.length > 0
@@ -171,21 +172,23 @@ function buildFoodPath(item, user) {
 ═══════════════════════════════════════════════════════════════ */
 
 function DishCarousel({ dishes, user, cart }) {
-  const navigate   = useNavigate();
+  const navigate = useNavigate();
   const sectionRef = useRef();
-  const [offset,   setOffset]   = useState(0);
+  const [offset, setOffset] = useState(0);
   const [isMobile, setIsMobile] = useState(false);
   const [btnState, setBtnState] = useState({});
 
   useEffect(() => {
+    let t;
     const check = () => setIsMobile(window.innerWidth < 640);
+    const debounced = () => { clearTimeout(t); t = setTimeout(check, 150); };
     check();
-    window.addEventListener("resize", check);
-    return () => window.removeEventListener("resize", check);
+    window.addEventListener("resize", debounced);
+    return () => { clearTimeout(t); window.removeEventListener("resize", debounced); };
   }, []);
 
   const visible = isMobile ? 2 : 4;
-  const max     = Math.max(0, dishes.length - visible);
+  const max = Math.max(0, dishes.length - visible);
 
   const handleAdd = useCallback(async (e, dish) => {
     e.stopPropagation();
@@ -196,12 +199,12 @@ function DishCarousel({ dishes, user, cart }) {
 
     const ok = await cart.addToCart({
       menuItemId: dish._id,
-      name:       dish.name,
-      img:        dish.img,
-      price:      dish.price,
-      variant:    dish.variant || "",
-      addons:     [],
-      qty:        1,
+      name: dish.name,
+      img: dish.img,
+      price: dish.price,
+      variant: dish.variant || "",
+      addons: [],
+      qty: 1,
     });
 
     setBtnState(s => ({ ...s, [id]: ok ? "done" : "error" }));
@@ -210,12 +213,14 @@ function DishCarousel({ dishes, user, cart }) {
 
   useST(sectionRef, () => {
     const st = { trigger: sectionRef.current, start: "top 80%" };
-    gsap.fromTo(".carousel-title",   { y:40, opacity:0 }, { y:0, opacity:1, duration:0.7,  ease:"back.out(1.7)", scrollTrigger:st });
-    gsap.fromTo(".carousel-heading", { y:50, opacity:0 }, { y:0, opacity:1, duration:0.75, ease:"back.out(1.5)", delay:0.12, scrollTrigger:st });
-    gsap.fromTo(".carousel-desc",    { y:30, opacity:0 }, { y:0, opacity:1, duration:0.6,  delay:0.24, scrollTrigger:st });
-    gsap.fromTo(".carousel-cta",     { scale:0.7, opacity:0 }, { scale:1, opacity:1, duration:0.55, ease:"back.out(2)", delay:0.34, scrollTrigger:st });
-    gsap.fromTo(".dish-card",        { y:60, opacity:0 }, { y:0, opacity:1, duration:0.6, ease:"back.out(1.4)", stagger:0.1, delay:0.1,
-      scrollTrigger:{ trigger:".carousel-track", start:"top 85%" } });
+    gsap.fromTo(".carousel-title", { y: 40, opacity: 0 }, { y: 0, opacity: 1, duration: 0.7, ease: "back.out(1.7)", scrollTrigger: st });
+    gsap.fromTo(".carousel-heading", { y: 50, opacity: 0 }, { y: 0, opacity: 1, duration: 0.75, ease: "back.out(1.5)", delay: 0.12, scrollTrigger: st });
+    gsap.fromTo(".carousel-desc", { y: 30, opacity: 0 }, { y: 0, opacity: 1, duration: 0.6, delay: 0.24, scrollTrigger: st });
+    gsap.fromTo(".carousel-cta", { scale: 0.7, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.55, ease: "back.out(2)", delay: 0.34, scrollTrigger: st });
+    gsap.fromTo(".dish-card", { y: 60, opacity: 0 }, {
+      y: 0, opacity: 1, duration: 0.6, ease: "back.out(1.4)", stagger: 0.1, delay: 0.1,
+      scrollTrigger: { trigger: ".carousel-track", start: "top 85%" }
+    });
   });
 
   return (
@@ -290,10 +295,12 @@ function OurStory() {
 
   useST(ref, () => {
     const st = { trigger: ref.current, start: "top 78%" };
-    gsap.fromTo(".story-img-wrap",  { x:-60, opacity:0 }, { x:0, opacity:1, duration:0.75, ease:"power3.out", scrollTrigger:st });
-    gsap.fromTo(".story-text-col",  { x:60,  opacity:0 }, { x:0, opacity:1, duration:0.75, ease:"power3.out", delay:0.12, scrollTrigger:st });
-    gsap.fromTo(".story-icon-card", { scale:0.6, opacity:0 }, { scale:1, opacity:1, duration:0.55, ease:"back.out(1.8)", stagger:0.1, delay:0.3,
-      scrollTrigger:{ trigger:".story-icons-row", start:"top 88%" } });
+    gsap.fromTo(".story-img-wrap", { x: -60, opacity: 0 }, { x: 0, opacity: 1, duration: 0.75, ease: "power3.out", scrollTrigger: st });
+    gsap.fromTo(".story-text-col", { x: 60, opacity: 0 }, { x: 0, opacity: 1, duration: 0.75, ease: "power3.out", delay: 0.12, scrollTrigger: st });
+    gsap.fromTo(".story-icon-card", { scale: 0.6, opacity: 0 }, {
+      scale: 1, opacity: 1, duration: 0.55, ease: "back.out(1.8)", stagger: 0.1, delay: 0.3,
+      scrollTrigger: { trigger: ".story-icons-row", start: "top 88%" }
+    });
   });
 
   return (
@@ -304,8 +311,8 @@ function OurStory() {
         </div>
         <div className="story-text-col h2-story-text">
           <p className="h2-eyebrow">OUR STORY <span className="h2-ornament">✦</span></p>
-          <h2 className="h2-display" style={{ marginBottom:16 }}>A Journey of <em>Taste</em><br />and <em>Tradition</em></h2>
-          <p className="h2-body" style={{ marginBottom:16 }}>
+          <h2 className="h2-display" style={{ marginBottom: 16 }}>A Journey of <em>Taste</em><br />and <em>Tradition</em></h2>
+          <p className="h2-body" style={{ marginBottom: 16 }}>
             At Noir Kitchen, we blend global inspiration with the finest ingredients to create unforgettable dining experiences.
           </p>
           <div className="h2-signature">Noir Kitchen Team</div>
@@ -315,8 +322,8 @@ function OurStory() {
       <div className="story-icons-row h2-icons-row">
         {STORY_ICONS.map(ic => {
           const navMap = {
-            "Unforgettable\nExperience":    "/moments",
-            "Meet Our\nStaff":              "/Noir-Kitchen-StaffMembers",
+            "Unforgettable\nExperience": "/moments",
+            "Meet Our\nStaff": "/Noir-Kitchen-StaffMembers",
             "Fresh & Quality\nIngredients": "/NoirKitchenIngredients",
             "Elegant\nAmbience": "/Elegantambience",
           };
@@ -326,7 +333,7 @@ function OurStory() {
               key={ic.title}
               className="story-icon-card h2-icon-card"
               onClick={to ? () => navigate(to) : undefined}
-              style={to ? { cursor:"pointer" } : {}}
+              style={to ? { cursor: "pointer" } : {}}
             >
               <div className="h2-icon-circle"><FontAwesomeIcon icon={ic.icon} /></div>
               <p className="h2-icon-title">{ic.title}</p>
@@ -343,26 +350,27 @@ function OurStory() {
    BOTTOM SPLIT
 ═══════════════════════════════════════════════════════════════ */
 
-function BottomSplit() {
+function BottomSplit({ reviews = [] }) {
   const navigate = useNavigate();
   const ref = useRef();
 
   useST(ref, () => {
     const st = { trigger: ref.current, start: "top 82%" };
-    gsap.fromTo(".fav-title",     { y:-30, opacity:0 }, { y:0, opacity:1, duration:0.6, ease:"back.out(1.7)", scrollTrigger:st });
-    gsap.fromTo(".fav-cat",       { y:40, opacity:0, scale:0.85 }, { y:0, opacity:1, scale:1, duration:0.5, ease:"back.out(1.8)", stagger:0.08, delay:0.15, scrollTrigger:st });
-    gsap.fromTo(".special-panel", { x:60, opacity:0 }, { x:0, opacity:1, duration:0.7, ease:"power3.out", delay:0.2, scrollTrigger:st });
+    gsap.fromTo(".fav-title", { y: -30, opacity: 0 }, { y: 0, opacity: 1, duration: 0.6, ease: "back.out(1.7)", scrollTrigger: st });
+    gsap.fromTo(".fav-cat", { y: 40, opacity: 0, scale: 0.85 }, { y: 0, opacity: 1, scale: 1, duration: 0.5, ease: "back.out(1.8)", stagger: 0.08, delay: 0.15, scrollTrigger: st });
+    gsap.fromTo(".special-panel", { x: 60, opacity: 0 }, { x: 0, opacity: 1, duration: 0.7, ease: "power3.out", delay: 0.2, scrollTrigger: st });
   });
 
   return (
     <section ref={ref} className="h2-bottom-split">
       <div className="h2-favs-panel">
-        <p className="fav-title h2-eyebrow" style={{ marginBottom:24 }}>CUSTOMER FAVORITES <span className="h2-ornament">✦</span></p>
-        <div className="h2-cats-row">
-          {CATEGORIES.map(c => (
-            <div key={c.label} className="fav-cat h2-cat-item" onClick={() => navigate("/NoirKitchen/Menu")}>
-              <div className="h2-cat-circle"><img src={c.img} alt={c.label} className="h2-cat-img" /></div>
-              <span className="h2-cat-label">{c.label}</span>
+        <p className="fav-title h2-eyebrow" style={{ marginBottom: 24 }}>WHAT OUR GUESTS SAY <span className="h2-ornament">✦</span></p>
+        <div className="h2-reviews-row">
+          {reviews.map(r => (
+            <div key={r._id} className="fav-cat h2-review-item">
+              <div className="h2-review-stars">{"★".repeat(r.rating)}{"☆".repeat(5 - r.rating)}</div>
+              <p className="h2-review-text">"{r.message}"</p>
+              <span className="h2-review-name">{r.user?.name || "Guest"}</span>
             </div>
           ))}
         </div>
@@ -384,47 +392,68 @@ function BottomSplit() {
   );
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   FOOTER BAR
-═══════════════════════════════════════════════════════════════ */
-
 function FooterBar({ user }) {
   const ref = useRef();
   const [email, setEmail] = useState("");
-  const [status, setStatus] = useState("idle"); // idle | loading | success | error
+  const [otp, setOtp] = useState("");
+  const [stage, setStage] = useState("input");
+  const [status, setStatus] = useState("idle");
 
   useST(ref, () => {
-    gsap.fromTo(".footer-item",      { y:30, opacity:0 }, { y:0, opacity:1, duration:0.55, ease:"back.out(1.5)", stagger:0.1,
-      scrollTrigger:{ trigger:ref.current, start:"top 90%" } });
-    gsap.fromTo(".footer-subscribe", { y:30, opacity:0 }, { y:0, opacity:1, duration:0.6, delay:0.4,
-      scrollTrigger:{ trigger:ref.current, start:"top 90%" } });
+    gsap.fromTo(".footer-item", { y: 30, opacity: 0 }, {
+      y: 0, opacity: 1, duration: 0.55, ease: "back.out(1.5)", stagger: 0.1,
+      scrollTrigger: { trigger: ref.current, start: "top 90%" }
+    });
+    gsap.fromTo(".footer-subscribe", { y: 30, opacity: 0 }, {
+      y: 0, opacity: 1, duration: 0.6, delay: 0.4,
+      scrollTrigger: { trigger: ref.current, start: "top 90%" }
+    });
   });
 
-  const handleSubscribe = async () => {
+  const handleSendOtp = async () => {
     const trimmed = email.trim();
     if (!trimmed || status === "loading") return;
-
     setStatus("loading");
     try {
-      const res  = await fetch(`${API_BASE}/api/connect`, {
+      const res = await fetch(`${API_BASE}/api/otp/send`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name:  user?.name || "Guest",
-          email: trimmed,
-        }),
+        body: JSON.stringify({ email: trimmed }),
       });
       const json = await res.json();
-      if (json.success) {
-        setStatus("success");
-        setEmail("");
-      } else {
-        setStatus("error");
-      }
+      setStatus("idle");
+      if (json.success) setStage("otp");
+      else { setStatus("error"); setTimeout(() => setStatus("idle"), 2500); }
     } catch {
-      setStatus("error");
+      setStatus("error"); setTimeout(() => setStatus("idle"), 2500);
     }
-    setTimeout(() => setStatus("idle"), 2500);
+  };
+
+  const handleVerifyOtp = async () => {
+    const trimmedOtp = otp.trim();
+    if (!trimmedOtp || status === "loading") return;
+    setStatus("loading");
+    try {
+      const verifyRes = await fetch(`${API_BASE}/api/otp/verify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim(), otp: trimmedOtp }),
+      });
+      const verifyJson = await verifyRes.json();
+      if (!verifyJson.success) { setStatus("error"); setTimeout(() => setStatus("idle"), 2500); return; }
+
+      const res = await fetch(`${API_BASE}/api/connect`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: user?.name || "Guest", email: email.trim() }),
+      });
+      const json = await res.json();
+      setStatus("idle");
+      if (json.success) { setStage("success"); setEmail(""); setOtp(""); }
+      else { setStatus("error"); setTimeout(() => setStatus("idle"), 2500); }
+    } catch {
+      setStatus("error"); setTimeout(() => setStatus("idle"), 2500);
+    }
   };
 
   return (
@@ -442,71 +471,94 @@ function FooterBar({ user }) {
       </div>
       <div className="footer-subscribe h2-subscribe">
         <p className="h2-footer-title">Stay Connected</p>
-        <p className="h2-footer-sub" style={{ marginBottom:10 }}>Get updates on new menu &amp; offers</p>
-        <div className="h2-email-row">
-          <input
-            type="email"
-            placeholder="Enter your email"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-            onKeyDown={e => { if (e.key === "Enter") handleSubscribe(); }}
-            className="h2-email-input"
-          />
-          <button
-            className="h2-email-btn"
-            onClick={handleSubscribe}
-            disabled={status === "loading"}
-            title="Subscribe"
-          >
-            {status === "loading" ? "…" : <FontAwesomeIcon icon={faArrowRight} />}
-          </button>
-        </div>
-        {status === "success" && (
-          <p style={{ fontSize:11, color:"#2e7d32", marginTop:6 }}>Thanks for subscribing!</p>
+        <p className="h2-footer-sub" style={{ marginBottom: 10 }}>Get updates on new menu &amp; offers</p>
+
+        {stage === "input" && (
+          <div className="h2-email-row">
+            <input type="email" placeholder="Enter your email" value={email}
+              onChange={e => setEmail(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter") handleSendOtp(); }}
+              className="h2-email-input" />
+            <button className="h2-email-btn" onClick={handleSendOtp} disabled={status === "loading"} title="Send OTP">
+              {status === "loading" ? "…" : <FontAwesomeIcon icon={faArrowRight} />}
+            </button>
+          </div>
         )}
-        {status === "error" && (
-          <p style={{ fontSize:11, color:"#c62828", marginTop:6 }}>Something went wrong. Please try again.</p>
+
+        {stage === "otp" && (
+          <div className="h2-email-row">
+            <input type="text" placeholder="Enter OTP" value={otp}
+              onChange={e => setOtp(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter") handleVerifyOtp(); }}
+              className="h2-email-input" />
+            <button className="h2-email-btn" onClick={handleVerifyOtp} disabled={status === "loading"} title="Verify OTP">
+              {status === "loading" ? "…" : "✓"}
+            </button>
+          </div>
         )}
+
+        {stage === "success" && <p style={{ fontSize: 11, color: "#2e7d32", marginTop: 6 }}>Thanks for subscribing!</p>}
+        {status === "error" && <p style={{ fontSize: 11, color: "#c62828", marginTop: 6 }}>Something went wrong. Please try again.</p>}
       </div>
     </footer>
   );
 }
-/* ═══════════════════════════════════════════════════════════════
-   MAIN EXPORT
-═══════════════════════════════════════════════════════════════ */
+const FLOAT_DOTS = [
+  { top: "20%", right: "8%", size: 10, color: "#E8763A", delay: "0s" },
+  { top: "35%", right: "4%", size: 6, color: "#FFB067", delay: "0.4s" },
+  { top: "60%", right: "12%", size: 8, color: "#C4510A", delay: "0.8s" },
+  { top: "75%", right: "6%", size: 5, color: "#E87A3A", delay: "1.2s" },
+];
+
+const BADGES = [
+  { icon: faLeaf, label: "Fresh Ingredients" },
+  { icon: faUtensils, label: "Master Chefs" },
+  { icon: faBowlFood, label: "Luxury Dining" },
+];
 
 export default function MainHome({ user, onLogout, cart }) {
   const navigate = useNavigate();
-  const [activeNav,    setActiveNav]    = useState("Home");
+  const [activeNav, setActiveNav] = useState("Home");
   const [bowl1Mounted, setBowl1Mounted] = useState(false);
-  const [dishes,       setDishes]       = useState([]);
-
+  const [dishes, setDishes] = useState([]);
+  const [reviews, setReviews] = useState([]);
   const [webGLOk, setWebGLOk] = useState(false);
 
-useEffect(() => {
-  setWebGLOk(isWebGLAvailable());
-}, []);
-  const page1Visible   = useRef(false);
-  const animating      = useRef(false);
+  useEffect(() => {
+    setWebGLOk(isWebGLAvailable());
+  }, []);
+  const page1Visible = useRef(false);
+  const animating = useRef(false);
   const activeTimeline = useRef(null);
 
   useEffect(() => {
     async function fetchDishes() {
       try {
-        const res  = await fetch(`${API_BASE}/api/menu`);
+        const res = await fetch(`${API_BASE}/api/menu`);
         const json = await res.json();
         if (!json.success) return;
-        const all      = json.data.filter(i => i.available !== false);
+        const all = json.data.filter(i => i.available !== false);
         const shuffled = all.sort(() => Math.random() - 0.5);
-        const count    = 6 + Math.floor(Math.random() * 4);
+        const count = 6 + Math.floor(Math.random() * 4);
         setDishes(shuffled.slice(0, count));
       } catch { /* silent */ }
     }
+    useEffect(() => {
+      async function fetchReviews() {
+        try {
+          const res = await fetch(`${API_BASE}/api/reviews`);
+          const json = await res.json();
+          if (!json.success) return;
+          setReviews(json.data.slice(0, 4));
+        } catch { /* silent */ }
+      }
+      fetchReviews();
+    }, []);
     fetchDishes();
   }, []);
 
   const releaseAnimating = useCallback(() => {
-    animating.current      = false;
+    animating.current = false;
     activeTimeline.current = null;
   }, []);
 
@@ -530,18 +582,7 @@ useEffect(() => {
     return () => window.removeEventListener("homeAnimationComplete", onReady);
   }, [showPage1]);
 
-  const floatDots = [
-    { top:"20%", right:"8%",  size:10, color:"#E8763A", delay:"0s"   },
-    { top:"35%", right:"4%",  size:6,  color:"#FFB067", delay:"0.4s" },
-    { top:"60%", right:"12%", size:8,  color:"#C4510A", delay:"0.8s" },
-    { top:"75%", right:"6%",  size:5,  color:"#E87A3A", delay:"1.2s" },
-  ];
 
-  const badges = [
-    { icon: faLeaf,     label: "Fresh Ingredients" },
-    { icon: faUtensils, label: "Master Chefs"       },
-    { icon: faBowlFood, label: "Luxury Dining"      },
-  ];
 
   return (
     <>
@@ -554,17 +595,17 @@ useEffect(() => {
       <div
         id="mp-page1"
         style={{
-          position:"relative", width:"100%", minHeight:"100vh", zIndex:30,
-          opacity:0, pointerEvents:"none",
-          fontFamily:"'Plus Jakarta Sans',sans-serif",
-          overflow:"hidden",
+          position: "relative", width: "100%", minHeight: "100vh", zIndex: 30,
+          opacity: 0, pointerEvents: "none",
+          fontFamily: "'Plus Jakarta Sans',sans-serif",
+          overflow: "hidden",
         }}
       >
         <img
           className="p1-bg"
           src="https://i.postimg.cc/6p7nY0n8/Background.png"
           alt="" aria-hidden
-          style={{ position:"absolute", inset:0, width:"100%", height:"100%", objectFit:"cover", zIndex:0, pointerEvents:"none", opacity:0 }}
+          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", zIndex: 0, pointerEvents: "none", opacity: 0 }}
         />
 
         <Navbar
@@ -577,121 +618,121 @@ useEffect(() => {
 
         <div className="noir-hero-body">
           <div className="noir-hero-text">
-            <div className="p1-pill" style={{ marginBottom:24, opacity:0 }}>
-              <div style={{ display:"inline-flex", alignItems:"center", gap:8, backgroundColor:"#c4510a0a", border:"0.5px solid #C4510A", borderRadius:25, padding:"8px 16px" }}>
-                <FontAwesomeIcon icon={faStar} style={{ color:"#C4510A", fontSize:"0.85em" }} />
+            <div className="p1-pill" style={{ marginBottom: 24, opacity: 0 }}>
+              <div style={{ display: "inline-flex", alignItems: "center", gap: 8, backgroundColor: "#c4510a0a", border: "0.5px solid #C4510A", borderRadius: 25, padding: "8px 16px" }}>
+                <FontAwesomeIcon icon={faStar} style={{ color: "#C4510A", fontSize: "0.85em" }} />
                 <span className="noir-pill-text">Elevated Taste, Timeless Experience</span>
               </div>
             </div>
             <h1 className="noir-h1">
-              <span className="p1-h1" style={{ display:"block", opacity:0 }}>Experience</span>
-              <span className="p1-h1" style={{ display:"block", fontStyle:"italic", color:"#C4510A", opacity:0 }}>Culinary Luxury</span>
-              <span className="p1-h1" style={{ display:"block", fontWeight:300, opacity:0 }}>Like Never Before</span>
+              <span className="p1-h1" style={{ display: "block", opacity: 0 }}>Experience</span>
+              <span className="p1-h1" style={{ display: "block", fontStyle: "italic", color: "#C4510A", opacity: 0 }}>Culinary Luxury</span>
+              <span className="p1-h1" style={{ display: "block", fontWeight: 300, opacity: 0 }}>Like Never Before</span>
             </h1>
-            <p className="p1-desc noir-desc" style={{ opacity:0 }}>Where timeless flavor meets modern elegance. Every dish tells a story of passion.</p>
+            <p className="p1-desc noir-desc" style={{ opacity: 0 }}>Where timeless flavor meets modern elegance. Every dish tells a story of passion.</p>
             <div className="noir-cta-row">
-              <button className="p1-cta noir-cta-primary" style={{ opacity:0 }} onClick={() => navigate("/NoirKitchen/Menu")}>
+              <button className="p1-cta noir-cta-primary" style={{ opacity: 0 }} onClick={() => navigate("/NoirKitchen/Menu")}>
                 <FontAwesomeIcon icon={faUtensils} /> Explore Menu
               </button>
-              <button className="p1-cta noir-cta-secondary" style={{ opacity:0 }} onClick={() => navigate("/reserve")}>
-                <FontAwesomeIcon icon={faCalendarAlt} style={{ color:"#C4510A" }} /> Reserve Table
+              <button className="p1-cta noir-cta-secondary" style={{ opacity: 0 }} onClick={() => navigate("/reserve")}>
+                <FontAwesomeIcon icon={faCalendarAlt} style={{ color: "#C4510A" }} /> Reserve Table
               </button>
             </div>
             <div className="noir-badges">
               {badges.map(({ icon, label }) => (
-                <div key={label} className="p1-badge noir-badge" style={{ opacity:0 }}>
-                  <FontAwesomeIcon icon={icon} style={{ fontSize:20, color:"#C4510A" }} />
-                  <span style={{ fontSize:12, fontWeight:600, color:"#2B2B2B" }}>{label}</span>
-                  <div style={{ width:24, height:2, background:"#C4510A", borderRadius:2 }} />
+                <div key={label} className="p1-badge noir-badge" style={{ opacity: 0 }}>
+                  <FontAwesomeIcon icon={icon} style={{ fontSize: 20, color: "#C4510A" }} />
+                  <span style={{ fontSize: 12, fontWeight: 600, color: "#2B2B2B" }}>{label}</span>
+                  <div style={{ width: 24, height: 2, background: "#C4510A", borderRadius: 2 }} />
                 </div>
               ))}
             </div>
           </div>
 
           <div className="noir-bowl-wrap">
-  {bowl1Mounted && (
-    webGLOk ? (
-      <CanvasErrorBoundary>
-        <Canvas
-          camera={{ position:[0, 0.8, 3.5], fov:40 }}
-          style={{ width:"100%", height:"100%" }}
-          gl={{ alpha:true, antialias:true, powerPreference:"low-power", failIfMajorPerformanceCaveat:false }}
-          dpr={[1, 1.5]}
-        >
-          <ambientLight intensity={1.2} color="#FFFFFF" />
-          <directionalLight position={[3, 6, 4]}  intensity={2.0} color="#FFFFFF" castShadow />
-          <directionalLight position={[-3, 2, 2]} intensity={1.0} color="#FFFFFF" />
-          <directionalLight position={[0, -2, 3]} intensity={0.5} color="#FFFFFF" />
-          <pointLight       position={[2, 3, 2]}  intensity={1.2} color="#FFFFFF" />
-          <Suspense fallback={<mesh><sphereGeometry args={[0.6,32,32]}/><meshStandardMaterial color="#EDE0CC"/></mesh>}>
-            <Bowl1 />
-            <Environment preset="studio" />
-          </Suspense>
-          <OrbitControls enableZoom={false} enablePan={false} autoRotate={false}
-            maxPolarAngle={Math.PI / 1.8} minPolarAngle={Math.PI / 3.5} />
-        </Canvas>
-      </CanvasErrorBoundary>
-    ) : (
-      // ✅ CSS fallback — shows when WebGL is blocked
-      <div style={{
-        width:"100%", height:"100%",
-        display:"flex", alignItems:"center", justifyContent:"center",
-      }}>
-        <div style={{
-          width:"min(380px, 80%)",
-          animation:"floatDot 3.2s ease-in-out infinite",
-          filter:"drop-shadow(0 24px 48px rgba(196,81,10,0.35))",
-        }}>
-          <svg viewBox="0 0 380 320" xmlns="http://www.w3.org/2000/svg" width="100%">
-            {/* Bowl body */}
-            <ellipse cx="190" cy="165" rx="155" ry="46" fill="#d4b896"/>
-            <path d="M35 165 Q40 268 190 285 Q340 268 345 165 Z" fill="#ede0cc"/>
-            <path d="M48 170 Q52 255 190 272 Q328 255 332 170 Z" fill="#e8d5bc"/>
-            <ellipse cx="190" cy="165" rx="155" ry="46" fill="none" stroke="#c9a87c" strokeWidth="3"/>
-            <ellipse cx="190" cy="162" rx="152" ry="42" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="2"/>
-            {/* Food - noodles */}
-            <path d="M90 172 Q115 182 145 176 Q165 171 190 178 Q215 185 240 176 Q265 167 290 174" fill="none" stroke="#c4510a" strokeWidth="4" strokeLinecap="round" opacity="0.8"/>
-            <path d="M100 182 Q130 192 158 186 Q178 181 196 188 Q220 195 248 184" fill="none" stroke="#e8763a" strokeWidth="3" strokeLinecap="round" opacity="0.7"/>
-            <path d="M108 192 Q138 200 165 196 Q185 192 205 198 Q230 204 255 194" fill="none" stroke="#c4510a" strokeWidth="2.5" strokeLinecap="round" opacity="0.55"/>
-            {/* Avocado */}
-            <ellipse cx="190" cy="168" rx="28" ry="22" fill="#5a8a3c" opacity="0.9"/>
-            <ellipse cx="190" cy="168" rx="14" ry="11" fill="#8B4513"/>
-            <ellipse cx="190" cy="168" rx="8"  ry="6"  fill="#5a3010"/>
-            {/* Tomato slices */}
-            <circle cx="130" cy="178" r="14" fill="#d94040" opacity="0.85"/>
-            <circle cx="130" cy="178" r="10" fill="#e85555" opacity="0.7"/>
-            <circle cx="255" cy="175" r="12" fill="#d94040" opacity="0.8"/>
-            {/* Greens */}
-            <ellipse cx="155" cy="158" rx="22" ry="10" fill="#3d7a28" opacity="0.7" transform="rotate(-20 155 158)"/>
-            <ellipse cx="220" cy="155" rx="20" ry="9"  fill="#4a8a30" opacity="0.65" transform="rotate(15 220 155)"/>
-            {/* Broth shimmer */}
-            <ellipse cx="190" cy="178" rx="100" ry="22" fill="rgba(196,120,60,0.15)"/>
-            {/* Rim shine */}
-            <path d="M70 152 Q130 140 190 143 Q250 146 310 156" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="2.5" strokeLinecap="round"/>
-            {/* Bowl base */}
-            <ellipse cx="190" cy="285" rx="72" ry="15" fill="#c9a87c"/>
-            <ellipse cx="190" cy="282" rx="68" ry="11" fill="#d4b896"/>
-          </svg>
-        </div>
-      </div>
-    )
-  )}
-  {floatDots.map((d, i) => (
-    <div key={i} style={{
-      position:"absolute", top:d.top, right:d.right,
-      width:d.size, height:d.size, borderRadius:"50%",
-      background:d.color, opacity:0.65,
-      animation:`floatDot 3s ease-in-out ${d.delay} infinite`,
-    }} />
-  ))}
-</div>
+            {bowl1Mounted && (
+              webGLOk ? (
+                <CanvasErrorBoundary>
+                  <Canvas
+                    camera={{ position: [0, 0.8, 3.5], fov: 40 }}
+                    style={{ width: "100%", height: "100%" }}
+                    gl={{ alpha: true, antialias: true, powerPreference: "low-power", failIfMajorPerformanceCaveat: false }}
+                    dpr={[1, 1.5]}
+                  >
+                    <ambientLight intensity={1.2} color="#FFFFFF" />
+                    <directionalLight position={[3, 6, 4]} intensity={2.0} color="#FFFFFF" castShadow />
+                    <directionalLight position={[-3, 2, 2]} intensity={1.0} color="#FFFFFF" />
+                    <directionalLight position={[0, -2, 3]} intensity={0.5} color="#FFFFFF" />
+                    <pointLight position={[2, 3, 2]} intensity={1.2} color="#FFFFFF" />
+                    <Suspense fallback={<mesh><sphereGeometry args={[0.6, 32, 32]} /><meshStandardMaterial color="#EDE0CC" /></mesh>}>
+                      <Bowl1 />
+                      <Environment preset="studio" />
+                    </Suspense>
+                    <OrbitControls enableZoom={false} enablePan={false} autoRotate={false}
+                      maxPolarAngle={Math.PI / 1.8} minPolarAngle={Math.PI / 3.5} />
+                  </Canvas>
+                </CanvasErrorBoundary>
+              ) : (
+                // ✅ CSS fallback — shows when WebGL is blocked
+                <div style={{
+                  width: "100%", height: "100%",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                  <div style={{
+                    width: "min(380px, 80%)",
+                    animation: "floatDot 3.2s ease-in-out infinite",
+                    filter: "drop-shadow(0 24px 48px rgba(196,81,10,0.35))",
+                  }}>
+                    <svg viewBox="0 0 380 320" xmlns="http://www.w3.org/2000/svg" width="100%">
+                      {/* Bowl body */}
+                      <ellipse cx="190" cy="165" rx="155" ry="46" fill="#d4b896" />
+                      <path d="M35 165 Q40 268 190 285 Q340 268 345 165 Z" fill="#ede0cc" />
+                      <path d="M48 170 Q52 255 190 272 Q328 255 332 170 Z" fill="#e8d5bc" />
+                      <ellipse cx="190" cy="165" rx="155" ry="46" fill="none" stroke="#c9a87c" strokeWidth="3" />
+                      <ellipse cx="190" cy="162" rx="152" ry="42" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="2" />
+                      {/* Food - noodles */}
+                      <path d="M90 172 Q115 182 145 176 Q165 171 190 178 Q215 185 240 176 Q265 167 290 174" fill="none" stroke="#c4510a" strokeWidth="4" strokeLinecap="round" opacity="0.8" />
+                      <path d="M100 182 Q130 192 158 186 Q178 181 196 188 Q220 195 248 184" fill="none" stroke="#e8763a" strokeWidth="3" strokeLinecap="round" opacity="0.7" />
+                      <path d="M108 192 Q138 200 165 196 Q185 192 205 198 Q230 204 255 194" fill="none" stroke="#c4510a" strokeWidth="2.5" strokeLinecap="round" opacity="0.55" />
+                      {/* Avocado */}
+                      <ellipse cx="190" cy="168" rx="28" ry="22" fill="#5a8a3c" opacity="0.9" />
+                      <ellipse cx="190" cy="168" rx="14" ry="11" fill="#8B4513" />
+                      <ellipse cx="190" cy="168" rx="8" ry="6" fill="#5a3010" />
+                      {/* Tomato slices */}
+                      <circle cx="130" cy="178" r="14" fill="#d94040" opacity="0.85" />
+                      <circle cx="130" cy="178" r="10" fill="#e85555" opacity="0.7" />
+                      <circle cx="255" cy="175" r="12" fill="#d94040" opacity="0.8" />
+                      {/* Greens */}
+                      <ellipse cx="155" cy="158" rx="22" ry="10" fill="#3d7a28" opacity="0.7" transform="rotate(-20 155 158)" />
+                      <ellipse cx="220" cy="155" rx="20" ry="9" fill="#4a8a30" opacity="0.65" transform="rotate(15 220 155)" />
+                      {/* Broth shimmer */}
+                      <ellipse cx="190" cy="178" rx="100" ry="22" fill="rgba(196,120,60,0.15)" />
+                      {/* Rim shine */}
+                      <path d="M70 152 Q130 140 190 143 Q250 146 310 156" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="2.5" strokeLinecap="round" />
+                      {/* Bowl base */}
+                      <ellipse cx="190" cy="285" rx="72" ry="15" fill="#c9a87c" />
+                      <ellipse cx="190" cy="282" rx="68" ry="11" fill="#d4b896" />
+                    </svg>
+                  </div>
+                </div>
+              )
+            )}
+            {floatDots.map((d, i) => (
+              <div key={i} style={{
+                position: "absolute", top: d.top, right: d.right,
+                width: d.size, height: d.size, borderRadius: "50%",
+                background: d.color, opacity: 0.65,
+                animation: `floatDot 3s ease-in-out ${d.delay} infinite`,
+              }} />
+            ))}
+          </div>
         </div>
 
         {/* Bottom fade */}
         <div style={{
-          position:"absolute", bottom:0, left:0, right:0, height:"200px",
-          zIndex:5, pointerEvents:"none",
-          background:"linear-gradient(to bottom, transparent, rgba(245,230,215,0.85) 60%, rgb(245,230,215) 100%)",
+          position: "absolute", bottom: 0, left: 0, right: 0, height: "200px",
+          zIndex: 5, pointerEvents: "none",
+          background: "linear-gradient(to bottom, transparent, rgba(245,230,215,0.85) 60%, rgb(245,230,215) 100%)",
         }} />
       </div>
 
@@ -699,34 +740,34 @@ useEffect(() => {
       <div
         id="mp-page2"
         style={{
-          position:"relative",
-          fontFamily:"'Plus Jakarta Sans',sans-serif",
-          backgroundImage:"url('https://i.postimg.cc/02ZVxvx3/Chat-GPT-Image-Jun-11-2026-02-01-52-PM.png')",
-          backgroundSize:"100% auto",
-          backgroundPosition:"top center",
-          backgroundRepeat:"repeat-y",
+          position: "relative",
+          fontFamily: "'Plus Jakarta Sans',sans-serif",
+          backgroundImage: "url('https://i.postimg.cc/02ZVxvx3/Chat-GPT-Image-Jun-11-2026-02-01-52-PM.png')",
+          backgroundSize: "100% auto",
+          backgroundPosition: "top center",
+          backgroundRepeat: "repeat-y",
           /* KEY FIX: prevent any child from bleeding outside the page width */
-          overflowX:"hidden",
-          width:"100%",
+          overflowX: "hidden",
+          width: "100%",
         }}
       >
         {/* Top fade */}
         <div style={{
-          position:"absolute", top:0, left:0, right:0, height:"160px",
-          zIndex:0, pointerEvents:"none",
-          background:"linear-gradient(to bottom, rgb(245,230,215) 0%, rgba(245,230,215,0.6) 40%, transparent 100%)",
+          position: "absolute", top: 0, left: 0, right: 0, height: "160px",
+          zIndex: 0, pointerEvents: "none",
+          background: "linear-gradient(to bottom, rgb(245,230,215) 0%, rgba(245,230,215,0.6) 40%, transparent 100%)",
         }} />
         {/* Bottom fade */}
         <div style={{
-          position:"absolute", bottom:0, left:0, right:0, height:"200px",
-          zIndex:0, pointerEvents:"none",
-          background:"linear-gradient(to bottom, transparent, rgba(245,230,215,0.85) 60%, rgb(245,230,215) 100%)",
+          position: "absolute", bottom: 0, left: 0, right: 0, height: "200px",
+          zIndex: 0, pointerEvents: "none",
+          background: "linear-gradient(to bottom, transparent, rgba(245,230,215,0.85) 60%, rgb(245,230,215) 100%)",
         }} />
 
-        <div style={{ position:"relative", zIndex:1 }}>
+        <div style={{ position: "relative", zIndex: 1 }}>
           <DishCarousel dishes={dishes} user={user} cart={cart} />
           <OurStory />
-          <BottomSplit />
+          <BottomSplit reviews={reviews} />
           <FooterBar user={user} />
         </div>
       </div>
@@ -1041,6 +1082,14 @@ useEffect(() => {
         .h2-cat-img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.4s ease; }
         .h2-cat-item:hover .h2-cat-img { transform: scale(1.1); }
         .h2-cat-label { font-size: 12px; font-weight: 600; color: #1A1A1A; border-bottom: 1.5px solid #C4510A; padding-bottom: 2px; }
+        .h2-reviews-row { display: flex; flex-direction: column; gap: 16px; }
+.h2-review-item {
+  background: rgba(255,255,255,0.55); border: 1px solid rgba(196,81,10,0.1);
+  border-radius: 14px; padding: 16px 18px;
+}
+.h2-review-stars { color: #C4510A; font-size: 13px; margin-bottom: 6px; letter-spacing: 2px; }
+.h2-review-text { font-size: 13px; color: #4A4540; line-height: 1.6; font-style: italic; margin-bottom: 8px; }
+.h2-review-name { font-size: 12px; font-weight: 700; color: #1A1A1A; }
         .h2-special-panel {
           position: relative; overflow: hidden;
           display: flex; align-items: center; justify-content: center; min-height: 300px;
@@ -1135,6 +1184,10 @@ useEffect(() => {
            MOBILE ≤768px
         ══════════════════════════════ */
         @media (max-width: 768px) {
+        .h2-icon-card, .h2-story-section, .h2-favs-panel, .h2-footer {
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+}
           .noir-navlinks-desktop { display: none; }
           .noir-user-wrap.p1-auth { display: none; }
           .noir-hamburger { display: flex; align-items: center; justify-content: center; }
