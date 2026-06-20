@@ -543,18 +543,18 @@ export default function MainHome({ user, onLogout, cart }) {
         setDishes(shuffled.slice(0, count));
       } catch { /* silent */ }
     }
-    useEffect(() => {
-      async function fetchReviews() {
-        try {
-          const res = await fetch(`${API_BASE}/api/reviews`);
-          const json = await res.json();
-          if (!json.success) return;
-          setReviews(json.data.slice(0, 4));
-        } catch { /* silent */ }
-      }
-      fetchReviews();
-    }, []);
     fetchDishes();
+  }, []);
+  useEffect(() => {
+    async function fetchReviews() {
+      try {
+        const res = await fetch(`${API_BASE}/api/reviews`);
+        const json = await res.json();
+        if (!json.success) return;
+        setReviews(json.data.slice(0, 4));
+      } catch { /* silent */ }
+    }
+    fetchReviews();
   }, []);
 
   const releaseAnimating = useCallback(() => {
@@ -639,7 +639,7 @@ export default function MainHome({ user, onLogout, cart }) {
               </button>
             </div>
             <div className="noir-badges">
-              {badges.map(({ icon, label }) => (
+              {BADGES.map(({ icon, label }) => (
                 <div key={label} className="p1-badge noir-badge" style={{ opacity: 0 }}>
                   <FontAwesomeIcon icon={icon} style={{ fontSize: 20, color: "#C4510A" }} />
                   <span style={{ fontSize: 12, fontWeight: 600, color: "#2B2B2B" }}>{label}</span>
@@ -717,7 +717,7 @@ export default function MainHome({ user, onLogout, cart }) {
                 </div>
               )
             )}
-            {floatDots.map((d, i) => (
+            {FLOAT_DOTS.map((d, i) => (
               <div key={i} style={{
                 position: "absolute", top: d.top, right: d.right,
                 width: d.size, height: d.size, borderRadius: "50%",
