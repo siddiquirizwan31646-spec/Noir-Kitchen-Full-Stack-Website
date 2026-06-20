@@ -292,7 +292,7 @@ function AppRoutes() {
         path="/about/the-noir-experience"
         element={
           <PrivateRoute user={user}>
-            <AboutPage user={user} cart={cart} />
+            <AboutPage user={user} onLogout={handleLogout} cart={cart} />
           </PrivateRoute>
         }
       />
@@ -301,7 +301,7 @@ function AppRoutes() {
         path="/Contact-us/Noir-Kitchen-Team"
         element={
           <PrivateRoute user={user}>
-            <ContactPage user={user} cart={cart} />
+            <ContactPage user={user} onLogout={handleLogout} cart={cart} />
           </PrivateRoute>
         }
       />
@@ -310,7 +310,7 @@ function AppRoutes() {
         path="/reviews"
         element={
           <PrivateRoute user={user}>
-            <ReviewPage user={user} cart={cart} />
+            <ReviewPage user={user} onLogout={handleLogout} cart={cart} />
           </PrivateRoute>
         }
       />
@@ -319,17 +319,17 @@ function AppRoutes() {
         path="/NoirKitchen/Menu"
         element={
           <PrivateRoute user={user}>
-            <MenuPage user={user} cart={cart} />
+            <MenuPage user={user} onLogout={handleLogout} cart={cart} />
           </PrivateRoute>
         }
       />
       <Route path="/user/:token" element={<UserOrders user={user} onLogout={handleLogout} cart={cart} />} />
-<Route path="/user/:token/:orderId" element={<UserOrders user={user} onLogout={handleLogout} cart={cart} />} />
+      <Route path="/user/:token/:orderId" element={<UserOrders user={user} onLogout={handleLogout} cart={cart} />} />
       <Route
         path="/profile"
         element={
           <PrivateRoute user={user}>
-            <Profile user={user} cart={cart} />
+            <Profile user={user} onLogout={handleLogout} cart={cart} />
           </PrivateRoute>
         }
       />

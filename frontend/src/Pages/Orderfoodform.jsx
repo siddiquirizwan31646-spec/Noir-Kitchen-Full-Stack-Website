@@ -5,6 +5,9 @@ import Navbar from "../component/ui/Navbar";
 const FONT_LINK =
     "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400;1,600&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap";
 
+const FA_LINK =
+    "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css";
+
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
 const GST_RATE = 0.18;
 const ESTIMATED_DELIVERY = "30–45 minutes";
@@ -17,7 +20,7 @@ function ReadonlyField({ label, value, icon }) {
         <div className="off-field-wrap">
             <label className="off-label">{label}</label>
             <div className="off-readonly">
-                {icon && <span className="off-readonly-icon">{icon}</span>}
+                {icon && <span className="off-readonly-icon"><i className={icon} /></span>}
                 <span className="off-readonly-val">{value || "—"}</span>
                 <span className="off-lock">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -48,97 +51,12 @@ function InputField({ label, name, value, onChange, placeholder, required, type 
     );
 }
 
-// ── Coupon Section (inline on order form) ─────────────────────────────────
-function CouponSection({ subtotal, appliedCoupon, onApply, onRemove }) {
-    const [code, setCode] = useState("");
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState("");
-
-    const handleApply = async () => {
-        const trimmed = code.trim().toUpperCase();
-        if (!trimmed) { setError("Please enter a coupon code."); return; }
-        setLoading(true);
-        setError("");
-        try {
-            const res = await fetch(`${API_BASE}/api/coupons/validate`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ code: trimmed, orderAmount: subtotal }),
-            });
-            const data = await res.json();
-            if (!res.ok || !data.valid) {
-                setError(data.message || "Invalid or expired coupon.");
-            } else {
-                onApply(data.coupon);
-                setCode("");
-            }
-        } catch {
-            setError("Could not validate coupon. Try again.");
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleRemove = () => {
-        onRemove();
-        setCode("");
-        setError("");
-    };
-
-    if (appliedCoupon) {
-        const saved = appliedCoupon.discountType === "Percentage"
-            ? Math.min(
-                Math.round(subtotal * appliedCoupon.discountValue / 100),
-                appliedCoupon.maxDiscount > 0 ? appliedCoupon.maxDiscount : Infinity
-              )
-            : appliedCoupon.discountValue;
-
-        return (
-            <div className="off-coupon-applied">
-                <div className="off-coupon-icon">🎟</div>
-                <div className="off-coupon-info">
-                    <span className="off-coupon-code">{appliedCoupon.code}</span>
-                    <span className="off-coupon-desc">
-                        {appliedCoupon.discountType === "Percentage"
-                            ? `${appliedCoupon.discountValue}% off${appliedCoupon.maxDiscount > 0 ? ` · max ₹${appliedCoupon.maxDiscount}` : ""}`
-                            : `Flat ₹${appliedCoupon.discountValue} off`}
-                    </span>
-                </div>
-                <span className="off-coupon-savings">−₹{saved.toLocaleString("en-IN")}</span>
-                <button className="off-coupon-remove" onClick={handleRemove} title="Remove coupon">✕</button>
-            </div>
-        );
-    }
-
-    return (
-        <div className="off-coupon-wrap">
-            <div className="off-coupon-row">
-                <div className="off-coupon-input-wrap">
-                    <span className="off-coupon-icon-sm">🎟</span>
-                    <input
-                        className="off-coupon-input"
-                        placeholder="Enter coupon code"
-                        value={code}
-                        onChange={(e) => { setCode(e.target.value.toUpperCase()); setError(""); }}
-                        onKeyDown={(e) => e.key === "Enter" && handleApply()}
-                        maxLength={30}
-                    />
-                </div>
-                <button className="off-coupon-btn" onClick={handleApply} disabled={loading}>
-                    {loading ? <span className="off-coupon-spinner" /> : "Apply"}
-                </button>
-            </div>
-            {error && <p className="off-coupon-error">⚠ {error}</p>}
-        </div>
-    );
-}
-
 // ── Location Section ───────────────────────────────────────────────────────
 function LocationSection({ coords, resolvedAddress, locating, locError, onRequestLocation, onReset }) {
     if (locError) {
         return (
             <div className="off-loc-error-card">
-                <div className="off-loc-err-icon">⚠️</div>
+                <div className="off-loc-err-icon"><i className="fa-solid fa-triangle-exclamation" /></div>
                 <p className="off-loc-err-title">Location Access Denied</p>
                 <p className="off-loc-err-msg">{locError}</p>
                 <button className="off-loc-btn" onClick={onRequestLocation}>
@@ -231,9 +149,6 @@ export default function OrderFoodForm({ user: propUser, onLogout, cart }) {
     const [orderId, setOrderId]       = useState(null);
     const [errors, setErrors]         = useState({});
     const [activeNav, setActiveNav]   = useState("Menu");
-
-    // ── Coupon state — initialise from router state (passed by FoodOrder) ──
-    const [appliedCoupon, setAppliedCoupon] = useState(orderState.appliedCoupon || null);
 
     // ── GPS state ──────────────────────────────────────────────────────────
     const [coords, setCoords] = useState(() => {
@@ -329,17 +244,8 @@ export default function OrderFoodForm({ user: propUser, onLogout, cart }) {
     const addonTotal = selectedAddons.reduce((s, a) => s + (parseInt(String(a.price || "0").replace(/[^\d]/g, "")) || 0), 0);
     const subtotalBeforeGst = (rawPrice + addonTotal) * qty;
 
-    // ── Coupon discount ────────────────────────────────────────────────────
-    const couponDiscount = (() => {
-        if (!appliedCoupon) return orderState.couponDiscount || 0;
-        if (appliedCoupon.discountType === "Flat") return Math.min(appliedCoupon.discountValue, subtotalBeforeGst);
-        const pct = Math.round(subtotalBeforeGst * appliedCoupon.discountValue / 100);
-        return appliedCoupon.maxDiscount > 0 ? Math.min(pct, appliedCoupon.maxDiscount) : pct;
-    })();
-
-    const subtotalAfterCoupon = subtotalBeforeGst - couponDiscount;
-    const gstAmount           = Math.round(subtotalAfterCoupon * GST_RATE);
-    const totalAmount         = subtotalAfterCoupon + gstAmount;
+    const gstAmount   = Math.round(subtotalBeforeGst * GST_RATE);
+    const totalAmount = subtotalBeforeGst + gstAmount;
 
     // Legacy item-level discount (kept for backward compat)
     const itemDiscount       = orderState.discount || item?.discount || null;
@@ -384,14 +290,9 @@ export default function OrderFoodForm({ user: propUser, onLogout, cart }) {
                 paymentMethod:       "Cash",
                 baseAmount:          rawPrice,
                 addonTotal,
-                couponCode:          appliedCoupon?.code || null,
-                discountAmount:      couponDiscount,
-                couponDiscount,
                 gstAmount,
                 totalAmount:         finalAmount,
-                discountApplied:     appliedCoupon
-                    ? `${appliedCoupon.code} (${appliedCoupon.discountType === "Percentage" ? appliedCoupon.discountValue + "%" : "₹" + appliedCoupon.discountValue} off)`
-                    : itemDiscount ? `${itemDiscount}% off` : "None",
+                discountApplied:     itemDiscount ? `${itemDiscount}% off` : "None",
                 estimatedDelivery:   ESTIMATED_DELIVERY,
                 customerId:          user?._id || user?.id || null,
                 fullName:            form.fullName.trim(),
@@ -410,20 +311,9 @@ export default function OrderFoodForm({ user: propUser, onLogout, cart }) {
             });
             const json = await res.json();
             if (json.success || json.orderId || json._id) {
-    setDeliveryOtp(json.deliveryOtp);
-    setOrderId(json.orderId || json._id || "NK" + Date.now());
-    setSubmitted(true);
-                if (appliedCoupon?.code) {
-    fetch(`${API_BASE}/api/coupons/redeem`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            code: appliedCoupon.code,
-            customerId: user?._id || user?.id || null,
-            
-        }),
-    }).catch(() => {});
-}
+                setDeliveryOtp(json.deliveryOtp);
+                setOrderId(json.orderId || json._id || "NK" + Date.now());
+                setSubmitted(true);
                 window.scrollTo({ top: 0, behavior: "smooth" });
             } else {
                 throw new Error(json.message || "Order failed");
@@ -436,54 +326,52 @@ export default function OrderFoodForm({ user: propUser, onLogout, cart }) {
     };
 
     if (loading) return (
-        <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#F8F1EA" }}>
-            <div className="off-spinner" />
+        <>
+            <link href={FA_LINK} rel="stylesheet" />
+            <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#F8F1EA" }}>
+                <div className="off-spinner" />
+            </div>
             <style>{STYLES}</style>
-        </div>
+        </>
     );
 
     if (submitted) return (
         <>
             <link href={FONT_LINK} rel="stylesheet" />
+            <link href={FA_LINK} rel="stylesheet" />
             <div className="off-root">
                 <Navbar user={user} onLogout={onLogout} activeNav={activeNav} setActiveNav={setActiveNav} cart={cart} />
                 <div className="off-success-wrap">
                     <div className="off-success-card">
-                        <div className="off-success-icon">✓</div>
+                        <div className="off-success-icon"><i className="fa-solid fa-check" /></div>
                         <h2 className="off-success-title">Order Placed!</h2>
                         <p className="off-success-sub">Your order has been received. We'll start preparing it right away.</p>
                         {orderId && (
-    <div className="off-order-id-wrap">
-        <span className="off-order-id-label">Order ID</span>
-        <span className="off-order-id-val">#{String(orderId).slice(-8).toUpperCase()}</span>
-    </div>
-)}
-{deliveryOtp && (
-    <div className="off-otp-wrap">
-        <span className="off-otp-label">Delivery OTP</span>
-        <span className="off-otp-val">{deliveryOtp}</span>
-        <p className="off-otp-hint">Share this with the delivery agent on arrival</p>
-    </div>
-)}
-<div className="off-success-details">
+                            <div className="off-order-id-wrap">
+                                <span className="off-order-id-label">Order ID</span>
+                                <span className="off-order-id-val">#{String(orderId).slice(-8).toUpperCase()}</span>
+                            </div>
+                        )}
+                        {deliveryOtp && (
+                            <div className="off-otp-wrap">
+                                <span className="off-otp-label">Delivery OTP</span>
+                                <span className="off-otp-val">{deliveryOtp}</span>
+                                <p className="off-otp-hint">Share this with the delivery agent on arrival</p>
+                            </div>
+                        )}
+                        <div className="off-success-details">
                             <div className="off-suc-row"><span>Item</span><strong>{decodedFood}</strong></div>
-                            {couponDiscount > 0 && (
-                                <div className="off-suc-row">
-                                    <span>Coupon ({appliedCoupon?.code})</span>
-                                    <strong style={{ color: "#2E7D32" }}>−₹{couponDiscount.toLocaleString("en-IN")}</strong>
-                                </div>
-                            )}
                             <div className="off-suc-row"><span>Total Paid</span><strong>₹{finalAmount.toLocaleString("en-IN")}</strong></div>
                             <div className="off-suc-row"><span>Payment</span><strong>Cash on Delivery</strong></div>
                             <div className="off-suc-row"><span>Delivery to</span><strong style={{maxWidth:220,textAlign:"right",fontSize:12}}>{resolvedAddress.split(",").slice(0,3).join(", ")}</strong></div>
                             <div className="off-suc-row"><span>Estimated Time</span><strong>{ESTIMATED_DELIVERY}</strong></div>
-                            <div className="off-suc-row"><span>Status</span><strong className="off-status-placed">● Placed</strong></div>
-                        </div>
-                        {couponDiscount > 0 && (
-                            <div className="off-success-savings">
-                                🎉 You saved ₹{couponDiscount.toLocaleString("en-IN")} on this order!
+                            <div className="off-suc-row">
+                                <span>Status</span>
+                                <strong className="off-status-placed">
+                                    <i className="fa-solid fa-circle off-status-dot" /> Placed
+                                </strong>
                             </div>
-                        )}
+                        </div>
                         <div className="off-success-btns">
                             <button className="off-btn-primary" onClick={() => navigate("/dashboard")}>Back to Home</button>
                             <button className="off-btn-outline" onClick={() => navigate("/NoirKitchen/Menu")}>Order More</button>
@@ -498,12 +386,13 @@ export default function OrderFoodForm({ user: propUser, onLogout, cart }) {
     return (
         <>
             <link href={FONT_LINK} rel="stylesheet" />
+            <link href={FA_LINK} rel="stylesheet" />
             <div className="off-root">
                 <Navbar user={user} onLogout={onLogout} activeNav={activeNav} setActiveNav={setActiveNav} cart={cart} />
 
                 <div className="off-hero">
                     <div className="off-hero-inner">
-                        <p className="off-eyebrow">Noir Kitchen <span className="off-orn">✦</span> Place Your Order</p>
+                        <p className="off-eyebrow">Noir Kitchen <i className="fa-solid fa-star off-orn" /> Place Your Order</p>
                         <h1 className="off-hero-h1">Almost There — <em className="off-accent">Confirm Your Order</em></h1>
                         <p className="off-hero-sub">Review your order details and confirm your GPS delivery location below.</p>
                     </div>
@@ -531,28 +420,28 @@ export default function OrderFoodForm({ user: propUser, onLogout, cart }) {
 
                             <div className="off-section">
                                 <div className="off-section-hd">
-                                    <span className="off-section-icon">🔒</span>
+                                    <span className="off-section-icon"><i className="fa-solid fa-lock" /></span>
                                     <div>
                                         <h3 className="off-section-title">Order Details</h3>
                                         <p className="off-section-sub">Auto-filled from your account &amp; selection</p>
                                     </div>
                                 </div>
                                 <div className="off-fields-grid">
-                                    <ReadonlyField label="Ordered Item" value={decodedFood} icon="🍽" />
-                                    <ReadonlyField label="Variant" value={selectedVariant?.label || "Standard"} icon="📋" />
-                                    <ReadonlyField label="Quantity" value={String(qty)} icon="📦" />
-                                    <ReadonlyField label="Add-ons" value={selectedAddons.length ? selectedAddons.map(a => a.label).join(", ") : "None"} icon="➕" />
-                                    <ReadonlyField label="Special Note" value={note || "None"} icon="📝" />
-                                    <ReadonlyField label="Payment Method" value="Cash on Delivery" icon="💵" />
-                                    <ReadonlyField label="Order Date & Time" value={orderDateTime} icon="🕐" />
-                                    <ReadonlyField label="Estimated Delivery" value={ESTIMATED_DELIVERY} icon="🛵" />
+                                    <ReadonlyField label="Ordered Item" value={decodedFood} icon="fa-solid fa-utensils" />
+                                    <ReadonlyField label="Variant" value={selectedVariant?.label || "Standard"} icon="fa-solid fa-clipboard-list" />
+                                    <ReadonlyField label="Quantity" value={String(qty)} icon="fa-solid fa-box" />
+                                    <ReadonlyField label="Add-ons" value={selectedAddons.length ? selectedAddons.map(a => a.label).join(", ") : "None"} icon="fa-solid fa-plus" />
+                                    <ReadonlyField label="Special Note" value={note || "None"} icon="fa-solid fa-pen-to-square" />
+                                    <ReadonlyField label="Payment Method" value="Cash on Delivery" icon="fa-solid fa-money-bill-wave" />
+                                    <ReadonlyField label="Order Date & Time" value={orderDateTime} icon="fa-regular fa-clock" />
+                                    <ReadonlyField label="Estimated Delivery" value={ESTIMATED_DELIVERY} icon="fa-solid fa-motorcycle" />
                                 </div>
                             </div>
 
                             {/* ── PRICE BREAKDOWN ── */}
                             <div className="off-section">
                                 <div className="off-section-hd">
-                                    <span className="off-section-icon">💰</span>
+                                    <span className="off-section-icon"><i className="fa-solid fa-coins" /></span>
                                     <div>
                                         <h3 className="off-section-title">Price Breakdown</h3>
                                         <p className="off-section-sub">Including GST &amp; applicable offers</p>
@@ -561,25 +450,12 @@ export default function OrderFoodForm({ user: propUser, onLogout, cart }) {
                                 <div className="off-price-breakdown">
                                     <div className="off-price-row"><span>Item Price × {qty}</span><span>₹{(rawPrice * qty).toLocaleString("en-IN")}</span></div>
                                     {addonTotal > 0 && <div className="off-price-row"><span>Add-ons</span><span>+ ₹{(addonTotal * qty).toLocaleString("en-IN")}</span></div>}
-                                    {couponDiscount > 0 && (
-                                        <div className="off-price-row off-price-coupon">
-                                            <span>
-                                                🎟 Coupon ({appliedCoupon?.code || "Applied"})
-                                            </span>
-                                            <span>− ₹{couponDiscount.toLocaleString("en-IN")}</span>
-                                        </div>
-                                    )}
                                     <div className="off-price-row"><span>GST (18%)</span><span>+ ₹{gstAmount.toLocaleString("en-IN")}</span></div>
                                     {itemDiscountAmount > 0 && (
                                         <div className="off-price-row off-price-discount"><span>Discount ({itemDiscount}% off)</span><span>− ₹{itemDiscountAmount.toLocaleString("en-IN")}</span></div>
                                     )}
                                     <div className="off-price-divider" />
                                     <div className="off-price-row off-price-total"><span>Total Amount</span><span>₹{finalAmount.toLocaleString("en-IN")}</span></div>
-                                    {couponDiscount > 0 && (
-                                        <p className="off-price-savings-msg">
-                                            ✓ Coupon saves you ₹{couponDiscount.toLocaleString("en-IN")}
-                                        </p>
-                                    )}
                                 </div>
                             </div>
                         </div>
@@ -588,7 +464,7 @@ export default function OrderFoodForm({ user: propUser, onLogout, cart }) {
                         <div className="off-right">
                             <div className="off-section">
                                 <div className="off-section-hd">
-                                    <span className="off-section-icon">👤</span>
+                                    <span className="off-section-icon"><i className="fa-solid fa-user" /></span>
                                     <div>
                                         <h3 className="off-section-title">Your Details</h3>
                                         <p className="off-section-sub">Enter your contact information</p>
@@ -600,29 +476,10 @@ export default function OrderFoodForm({ user: propUser, onLogout, cart }) {
                                 </div>
                             </div>
 
-                            {/* ── COUPON SECTION (on order form too) ── */}
-                            <div className="off-section">
-                                <div className="off-section-hd">
-                                    <span className="off-section-icon">🎟</span>
-                                    <div>
-                                        <h3 className="off-section-title">Coupon Code</h3>
-                                        <p className="off-section-sub">
-                                            {appliedCoupon ? "Coupon applied — discount reflected in total" : "Have a coupon? Apply it here"}
-                                        </p>
-                                    </div>
-                                </div>
-                                <CouponSection
-                                    subtotal={subtotalBeforeGst}
-                                    appliedCoupon={appliedCoupon}
-                                    onApply={setAppliedCoupon}
-                                    onRemove={() => setAppliedCoupon(null)}
-                                />
-                            </div>
-
                             {/* ── GPS / MAP SECTION ── */}
                             <div className="off-section">
                                 <div className="off-section-hd">
-                                    <span className="off-section-icon">📍</span>
+                                    <span className="off-section-icon"><i className="fa-solid fa-location-dot" /></span>
                                     <div>
                                         <h3 className="off-section-title">Delivery Location</h3>
                                         <p className="off-section-sub">
@@ -647,12 +504,6 @@ export default function OrderFoodForm({ user: propUser, onLogout, cart }) {
                                     <span className="off-summary-label">Item</span>
                                     <span className="off-summary-val">{decodedFood}</span>
                                 </div>
-                                {couponDiscount > 0 && (
-                                    <div className="off-summary-item">
-                                        <span className="off-summary-label">Coupon Savings</span>
-                                        <span className="off-summary-coupon-val">−₹{couponDiscount.toLocaleString("en-IN")}</span>
-                                    </div>
-                                )}
                                 <div className="off-summary-item">
                                     <span className="off-summary-label">Total</span>
                                     <span className="off-summary-total">₹{finalAmount.toLocaleString("en-IN")}</span>
@@ -714,7 +565,7 @@ const STYLES = `
 .off-hero { background: linear-gradient(135deg,#2B1600,#4A2500); padding: 52px 48px 48px; text-align: center; }
 .off-hero-inner { max-width: 680px; margin: 0 auto; }
 .off-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: 2.5px; text-transform: uppercase; color: #F0924A; display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 16px; }
-.off-orn { opacity: 0.6; }
+.off-orn { opacity: 0.6; font-size: 9px; }
 .off-hero-h1 { font-family: 'Cormorant Garamond', serif; font-size: clamp(28px,4vw,52px); font-weight: 600; line-height: 1.1; color: #F8F1EA; margin-bottom: 14px; }
 .off-accent { font-style: italic; color: #F0924A; }
 .off-hero-sub { font-size: 14px; color: rgba(248,241,234,0.6); line-height: 1.7; }
@@ -733,7 +584,7 @@ const STYLES = `
 .off-veg .off-veg-circle { background: #4CAF50; } .off-nonveg .off-veg-circle { background: #D32F2F; }
 .off-section { background: #fff; border-radius: 20px; border: 1px solid rgba(216,106,28,0.1); box-shadow: 0 4px 20px rgba(0,0,0,0.06); padding: 24px; margin-bottom: 20px; }
 .off-section-hd { display: flex; align-items: flex-start; gap: 14px; padding-bottom: 18px; margin-bottom: 20px; border-bottom: 1px solid rgba(216,106,28,0.1); }
-.off-section-icon { font-size: 22px; line-height: 1; flex-shrink: 0; margin-top: 2px; }
+.off-section-icon { font-size: 18px; line-height: 1; flex-shrink: 0; margin-top: 2px; color: #D86A1C; width: 22px; display: inline-flex; justify-content: center; }
 .off-section-title { font-family: 'Cormorant Garamond', serif; font-size: 20px; font-weight: 600; color: #1A1208; margin-bottom: 3px; }
 .off-section-sub { font-size: 12px; color: #9A8570; }
 
@@ -741,7 +592,7 @@ const STYLES = `
 .off-label { font-size: 10px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: #9A8570; }
 .off-req { color: #D86A1C; margin-left: 3px; }
 .off-readonly { display: flex; align-items: center; gap: 10px; background: rgba(248,241,234,0.6); border: 1.5px solid rgba(216,106,28,0.12); border-radius: 12px; padding: 11px 14px; }
-.off-readonly-icon { font-size: 14px; flex-shrink: 0; }
+.off-readonly-icon { font-size: 13px; flex-shrink: 0; color: #D86A1C; width: 16px; display: inline-flex; justify-content: center; }
 .off-readonly-val { font-size: 13px; color: #1A1208; font-weight: 500; flex: 1; }
 .off-lock { margin-left: auto; color: #C4B09A; flex-shrink: 0; }
 .off-fields-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
@@ -755,56 +606,12 @@ const STYLES = `
 .off-input:disabled { color: #6B5B45; }
 .off-err-msg { font-size: 11px; color: #D32F2F; font-weight: 500; }
 
-/* ── COUPON ── */
-.off-coupon-wrap { display: flex; flex-direction: column; gap: 8px; }
-.off-coupon-row { display: flex; gap: 10px; }
-.off-coupon-input-wrap {
-  flex: 1; display: flex; align-items: center; gap: 8px;
-  background: rgba(248,241,234,0.6); border: 1.5px solid rgba(216,106,28,0.2);
-  border-radius: 12px; padding: 0 12px; transition: border-color 0.2s;
-}
-.off-coupon-input-wrap:focus-within { border-color: #D86A1C; background: #fff; }
-.off-coupon-icon-sm { font-size: 14px; flex-shrink: 0; }
-.off-coupon-input {
-  flex: 1; border: none; background: transparent; outline: none;
-  font-family: 'Plus Jakarta Sans', sans-serif; font-size: 13px;
-  font-weight: 600; color: #1A1208; letter-spacing: 1px; padding: 11px 0;
-}
-.off-coupon-input::placeholder { color: #C4B09A; font-weight: 400; letter-spacing: 0; }
-.off-coupon-btn {
-  flex-shrink: 0; padding: 11px 20px;
-  background: linear-gradient(135deg,#D86A1C,#F0924A);
-  color: #fff; border: none; border-radius: 10px;
-  font-family: 'Plus Jakarta Sans', sans-serif; font-size: 12px; font-weight: 700;
-  cursor: pointer; transition: all 0.2s;
-  display: flex; align-items: center; justify-content: center; min-width: 70px;
-}
-.off-coupon-btn:hover:not(:disabled) { transform: translateY(-1px); }
-.off-coupon-btn:disabled { opacity: 0.7; cursor: wait; }
-.off-coupon-spinner { width: 13px; height: 13px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; animation: offSpin 0.7s linear infinite; }
-.off-coupon-error { font-size: 11px; color: #D32F2F; font-weight: 500; }
-
-.off-coupon-applied {
-  display: flex; align-items: center; gap: 12px;
-  padding: 12px 16px; border-radius: 12px;
-  background: rgba(46,125,50,0.06); border: 1.5px solid rgba(46,125,50,0.25);
-}
-.off-coupon-icon { font-size: 18px; flex-shrink: 0; }
-.off-coupon-info { flex: 1; }
-.off-coupon-code { font-size: 13px; font-weight: 700; color: #2E7D32; letter-spacing: 1px; display: block; }
-.off-coupon-desc { font-size: 11px; color: #6B5B45; display: block; margin-top: 2px; }
-.off-coupon-savings { font-size: 15px; font-weight: 700; color: #2E7D32; flex-shrink: 0; }
-.off-coupon-remove { width: 26px; height: 26px; border-radius: 50%; background: rgba(211,47,47,0.08); border: 1px solid rgba(211,47,47,0.2); color: #D32F2F; cursor: pointer; font-size: 11px; display: flex; align-items: center; justify-content: center; transition: background 0.2s; flex-shrink: 0; }
-.off-coupon-remove:hover { background: rgba(211,47,47,0.15); }
-
 /* ── PRICE ── */
 .off-price-breakdown { display: flex; flex-direction: column; gap: 10px; }
 .off-price-row { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: #6B5B45; }
 .off-price-discount { color: #2E7D32; }
-.off-price-coupon { color: #2E7D32; font-weight: 600; }
 .off-price-total { font-family: 'Cormorant Garamond', serif; font-size: 20px; font-weight: 600; color: #1A1208; }
 .off-price-divider { height: 1px; background: linear-gradient(90deg, transparent, rgba(216,106,28,0.2), transparent); margin: 4px 0; }
-.off-price-savings-msg { font-size: 11px; color: #2E7D32; font-weight: 600; background: rgba(46,125,50,0.06); padding: 7px 10px; border-radius: 8px; }
 
 /* ── LOCATION ── */
 .off-loc-prompt { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 28px 20px; gap: 12px; background: rgba(216,106,28,0.03); border-radius: 14px; border: 1.5px dashed rgba(216,106,28,0.25); }
@@ -816,7 +623,7 @@ const STYLES = `
 .off-loc-det-title { font-size: 13px; font-weight: 700; color: #1A1208; margin-bottom: 3px; }
 .off-loc-det-sub { font-size: 11px; color: #9A8570; }
 .off-loc-error-card { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 24px; gap: 10px; background: rgba(211,47,47,0.04); border-radius: 14px; border: 1.5px solid rgba(211,47,47,0.2); }
-.off-loc-err-icon { font-size: 28px; }
+.off-loc-err-icon { font-size: 24px; color: #D32F2F; }
 .off-loc-err-title { font-size: 14px; font-weight: 700; color: #D32F2F; }
 .off-loc-err-msg { font-size: 12px; color: #6B5B45; line-height: 1.6; max-width: 300px; }
 .off-loc-btn { display: inline-flex; align-items: center; gap: 8px; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 12px; font-weight: 700; color: #D86A1C; background: rgba(216,106,28,0.1); border: 1.5px solid rgba(216,106,28,0.3); border-radius: 24px; padding: 9px 20px; cursor: pointer; transition: all 0.2s; }
@@ -839,7 +646,6 @@ const STYLES = `
 .off-summary-label { font-size: 11px; font-weight: 600; color: #9A8570; text-transform: uppercase; letter-spacing: 1px; }
 .off-summary-val { font-size: 13px; font-weight: 600; color: #1A1208; max-width: 180px; text-align: right; }
 .off-summary-total { font-family: 'Cormorant Garamond', serif; font-size: 28px; font-weight: 600; color: #D86A1C; }
-.off-summary-coupon-val { font-size: 14px; font-weight: 700; color: #2E7D32; }
 
 .off-loc-status-pill { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 700; border-radius: 20px; padding: 7px 14px; letter-spacing: 0.3px; }
 .off-loc-ok { background: rgba(76,175,80,0.1); color: #2E7D32; border: 1px solid rgba(76,175,80,0.25); }
@@ -863,7 +669,7 @@ const STYLES = `
 .off-success-wrap { min-height: calc(100vh - 80px); display: flex; align-items: center; justify-content: center; padding: 40px 20px; }
 .off-success-card { background: #fff; border-radius: 28px; border: 1px solid rgba(216,106,28,0.12); box-shadow: 0 20px 60px rgba(0,0,0,0.1); padding: 48px 40px; max-width: 520px; width: 100%; text-align: center; animation: offScaleIn 0.5s cubic-bezier(0.22,1,0.36,1) both; }
 @keyframes offScaleIn { from{opacity:0;transform:scale(0.9);} to{opacity:1;transform:scale(1);} }
-.off-success-icon { width: 72px; height: 72px; border-radius: 50%; background: linear-gradient(135deg,#4CAF50,#66BB6A); color: #fff; font-size: 32px; font-weight: 700; display: flex; align-items: center; justify-content: center; margin: 0 auto 24px; box-shadow: 0 8px 28px rgba(76,175,80,0.35); }
+.off-success-icon { width: 72px; height: 72px; border-radius: 50%; background: linear-gradient(135deg,#4CAF50,#66BB6A); color: #fff; font-size: 28px; font-weight: 700; display: flex; align-items: center; justify-content: center; margin: 0 auto 24px; box-shadow: 0 8px 28px rgba(76,175,80,0.35); }
 .off-success-title { font-family: 'Cormorant Garamond', serif; font-size: 40px; font-weight: 600; color: #1A1208; margin-bottom: 10px; }
 .off-success-sub { font-size: 14px; color: #6B5B45; line-height: 1.7; margin-bottom: 24px; }
 .off-order-id-wrap { display: inline-flex; align-items: center; gap: 10px; background: rgba(216,106,28,0.08); border: 1px solid rgba(216,106,28,0.2); border-radius: 12px; padding: 10px 20px; margin-bottom: 24px; }
@@ -872,8 +678,8 @@ const STYLES = `
 .off-success-details { background: #F8F1EA; border-radius: 14px; padding: 16px 20px; margin-bottom: 16px; display: flex; flex-direction: column; gap: 10px; text-align: left; }
 .off-suc-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; font-size: 13px; }
 .off-suc-row span { color: #9A8570; flex-shrink: 0; } .off-suc-row strong { color: #1A1208; font-weight: 600; text-align: right; }
-.off-status-placed { color: #D86A1C !important; }
-.off-success-savings { background: rgba(46,125,50,0.08); border: 1px solid rgba(46,125,50,0.2); border-radius: 10px; padding: 10px 16px; font-size: 13px; font-weight: 700; color: #2E7D32; margin-bottom: 20px; }
+.off-status-placed { color: #D86A1C !important; display: inline-flex; align-items: center; gap: 6px; }
+.off-status-dot { font-size: 8px; }
 .off-success-btns { display: flex; flex-direction: column; gap: 10px; }
 
 @media (max-width: 900px) {
@@ -888,8 +694,6 @@ const STYLES = `
   .off-hero { padding: 32px 16px 28px; }
   .off-form-wrap { padding: 20px 14px 48px; }
   .off-loc-map-frame { height: 160px; }
-  .off-coupon-row { flex-direction: column; }
-  .off-coupon-btn { width: 100%; }
 }
 @media (prefers-reduced-motion: reduce) {
   .off-success-card { animation: none; }

@@ -141,16 +141,16 @@ export default function OTPVerify({ email, onVerified, onBack }) {
       const data = await res.json();
 
       if (data.success) {
-        sessionStorage.removeItem("otpEmail");
-        sessionStorage.removeItem("otpPassword");
-        sessionStorage.removeItem("otpAddress");
-        setSuccess("Verified! Welcome to Noir Kitchen.");
-        // Animate card out then call onVerified
-        gsap.to(cardRef.current, {
-          scale: 1.04, opacity: 0, y: -30, duration: 0.45, ease: "power2.in",
-          onComplete: () => onVerified?.(data),
-        });
-      } else {
+  sessionStorage.removeItem("otpEmail");
+  sessionStorage.removeItem("otpPassword");
+  sessionStorage.removeItem("otpAddress");
+  localStorage.setItem("justLoggedIn", "1"); 
+  setSuccess("Verified! Welcome to Noir Kitchen.");
+  gsap.to(cardRef.current, {
+    scale: 1.04, opacity: 0, y: -30, duration: 0.45, ease: "power2.in",
+    onComplete: () => onVerified?.(data),
+  });
+} else {
         setError(data.message || "Invalid OTP. Please try again.");
         triggerShake();
         // Clear inputs on wrong OTP

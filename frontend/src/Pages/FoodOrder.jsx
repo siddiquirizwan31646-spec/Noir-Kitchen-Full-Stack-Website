@@ -50,103 +50,41 @@ function VegDot({ veg }) {
     );
 }
 
-// ── Coupon Section ─────────────────────────────────────────────────────────
-function CouponSection({ subtotal, appliedCoupon, onApply, onRemove }) {
-    const [code, setCode] = useState("");
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState("");
-
-    const handleApply = async () => {
-        const trimmed = code.trim().toUpperCase();
-        if (!trimmed) { setError("Please enter a coupon code."); return; }
-        setLoading(true);
-        setError("");
-        try {
-            const res = await fetch(`${API_BASE}/api/coupons/validate`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ code: trimmed, orderAmount: subtotal }),
-            });
-            const data = await res.json();
-            if (!res.ok || !data.valid) {
-                setError(data.message || "Invalid or expired coupon.");
-            } else {
-                onApply(data.coupon);
-                setCode("");
-            }
-        } catch {
-            setError("Could not validate coupon. Try again.");
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleRemove = () => {
-        onRemove();
-        setCode("");
-        setError("");
-    };
-
-    if (appliedCoupon) {
-        const saved = appliedCoupon.discountType === "Percentage"
-            ? Math.min(
-                Math.round(subtotal * appliedCoupon.discountValue / 100),
-                appliedCoupon.maxDiscount > 0 ? appliedCoupon.maxDiscount : Infinity
-              )
-            : appliedCoupon.discountValue;
-
-        return (
-            <div className="fo-coupon-applied">
-                <div className="fo-coupon-applied-left">
-                    <div className="fo-coupon-applied-icon">
-                        <i className="fa-solid fa-ticket" />
+// ── Legal Modal (Privacy Policy / Terms of Use) ────────────────────────────
+function LegalModal({ open, title, onClose }) {
+    if (!open) return null;
+    return (
+        <div className="fo-modal-overlay" onClick={onClose}>
+            <div className="fo-modal-card" onClick={(e) => e.stopPropagation()}>
+                <div className="fo-modal-header">
+                    <div className="fo-modal-title-wrap">
+                        <i className="fa-solid fa-scale-balanced fo-modal-icon" />
+                        <h3 className="fo-modal-title">{title}</h3>
                     </div>
-                    <div>
-                        <span className="fo-coupon-applied-code">{appliedCoupon.code}</span>
-                        <span className="fo-coupon-applied-desc">
-                            {appliedCoupon.discountType === "Percentage"
-                                ? `${appliedCoupon.discountValue}% off${appliedCoupon.maxDiscount > 0 ? ` (max ₹${appliedCoupon.maxDiscount})` : ""}`
-                                : `Flat ₹${appliedCoupon.discountValue} off`}
-                        </span>
-                    </div>
-                </div>
-                <div className="fo-coupon-applied-right">
-                    <span className="fo-coupon-savings">−₹{saved.toLocaleString("en-IN")}</span>
-                    <button className="fo-coupon-remove" onClick={handleRemove} title="Remove coupon">
+                    <button className="fo-modal-close" onClick={onClose} aria-label="Close">
                         <i className="fa-solid fa-xmark" />
                     </button>
                 </div>
-            </div>
-        );
-    }
-
-    return (
-        <div className="fo-coupon-wrap">
-            <div className="fo-coupon-row">
-                <div className="fo-coupon-input-wrap">
-                    <i className="fa-solid fa-ticket fo-coupon-input-icon" />
-                    <input
-                        className="fo-coupon-input"
-                        placeholder="Enter coupon code"
-                        value={code}
-                        onChange={(e) => { setCode(e.target.value.toUpperCase()); setError(""); }}
-                        onKeyDown={(e) => e.key === "Enter" && handleApply()}
-                        maxLength={30}
-                    />
+                <div className="fo-modal-body">
+                    <p>
+                        This is placeholder {title.toLowerCase()} content for Noir Kitchen. Replace this
+                        section with your finalized legal copy covering data collection, usage, customer
+                        rights, and order terms before going live.
+                    </p>
+                    <p>
+                        By using this service you agree to the practices described here, including how your
+                        order, contact, and delivery location information is collected, stored, and used to
+                        fulfil your order.
+                    </p>
+                    <p>
+                        For questions about this policy, please contact the restaurant directly through the
+                        details provided on the Reservations page.
+                    </p>
                 </div>
-                <button
-                    className={`fo-coupon-btn ${loading ? "fo-coupon-btn-loading" : ""}`}
-                    onClick={handleApply}
-                    disabled={loading}
-                >
-                    {loading ? <span className="fo-coupon-spinner" /> : "Apply"}
-                </button>
+                <div className="fo-modal-footer">
+                    <button className="fo-modal-btn" onClick={onClose}>I Understand</button>
+                </div>
             </div>
-            {error && (
-                <p className="fo-coupon-error">
-                    <i className="fa-solid fa-circle-exclamation" /> {error}
-                </p>
-            )}
         </div>
     );
 }
@@ -171,8 +109,11 @@ export default function FoodOrder({ user, onLogout, cart }) {
     const [suggested, setSuggested] = useState([]);
     const [activeNav, setActiveNav] = useState("Menu");
 
-    // ── Coupon state ────────────────────────────────────────────────────────
-    const [appliedCoupon, setAppliedCoupon] = useState(null);
+    // ── Legal modals ─────────────────────────────────────────────────────────
+    const [legalModal, setLegalModal] = useState(null); // "privacy" | "terms" | null
+
+    // ── Careers toast ─────────────────────────────────────────────────────────
+    const [careersMsg, setCareersMsg] = useState(false);
 
     // ── Delivery location ──────────────────────────────────────────────────
     const [coords, setCoords] = useState(() => {
@@ -232,7 +173,6 @@ export default function FoodOrder({ user, onLogout, cart }) {
         setQty(1);
         setNote("");
         setAdded(false);
-        setAppliedCoupon(null);
 
         async function load() {
             setLoading(true);
@@ -260,6 +200,13 @@ export default function FoodOrder({ user, onLogout, cart }) {
     }, [decodedFood]);
 
     useEffect(() => { window.scrollTo({ top: 0, behavior: "smooth" }); }, [decodedFood]);
+
+    // Auto-dismiss the careers notice
+    useEffect(() => {
+        if (!careersMsg) return;
+        const t = setTimeout(() => setCareersMsg(false), 3000);
+        return () => clearTimeout(t);
+    }, [careersMsg]);
 
     const displayItem = item || {
         name: decodedFood,
@@ -311,16 +258,7 @@ export default function FoodOrder({ user, onLogout, cart }) {
     }, 0);
 
     const subtotal = (basePrice + addonTotal) * qty;
-
-    // ── Coupon discount calculation ────────────────────────────────────────
-    const couponDiscount = (() => {
-        if (!appliedCoupon) return 0;
-        if (appliedCoupon.discountType === "Flat") return Math.min(appliedCoupon.discountValue, subtotal);
-        const pct = Math.round(subtotal * appliedCoupon.discountValue / 100);
-        return appliedCoupon.maxDiscount > 0 ? Math.min(pct, appliedCoupon.maxDiscount) : pct;
-    })();
-
-    const total = subtotal - couponDiscount;
+    const total = subtotal;
 
     const handleAddToCart = async () => {
         if (!item || !cart) return;
@@ -367,9 +305,6 @@ export default function FoodOrder({ user, onLogout, cart }) {
                     latitude: coords.lat,
                     longitude: coords.lng,
                     deliveryAddress: resolvedAddress,
-                    // ── Pass coupon to order form ──
-                    appliedCoupon: appliedCoupon || null,
-                    couponDiscount,
                 },
             }
         );
@@ -379,11 +314,20 @@ export default function FoodOrder({ user, onLogout, cart }) {
         const list = [];
         if (item?.img) list.push(item.img);
         if (item?.images && Array.isArray(item.images)) list.push(...item.images);
-        if (!list.length) list.push("https://images.unsplash.com/photo-1585937421612-70a008356fbe?w=600&q=80");
-        return [...new Set(list)];
+        // Drop empty/falsy/whitespace-only entries so broken thumbnails never render
+        const cleaned = list.map((u) => (typeof u === "string" ? u.trim() : "")).filter(Boolean);
+        if (!cleaned.length) cleaned.push("https://images.unsplash.com/photo-1585937421612-70a008356fbe?w=600&q=80");
+        return [...new Set(cleaned)];
     })();
 
     const tags = item?.tags || (displayItem.veg ? ["Gluten Free", "No Added Preservatives"] : ["Gluten Free"]);
+
+    const handleFooterClick = (label) => {
+        if (label === "Privacy Policy") setLegalModal("privacy");
+        else if (label === "Terms of Use") setLegalModal("terms");
+        else if (label === "Reservations") navigate("/reserve");
+        else if (label === "Careers") setCareersMsg(true);
+    };
 
     if (loading)
         return (
@@ -483,7 +427,11 @@ export default function FoodOrder({ user, onLogout, cart }) {
                             <div className="fo-thumbs">
                                 {imgs.map((src, i) => (
                                     <button key={i} onClick={() => setActiveImg(i)} className={`fo-thumb ${activeImg === i ? "fo-thumb-active" : ""}`}>
-                                        <img src={src} alt="" />
+                                        <img
+                                            src={src}
+                                            alt=""
+                                            onError={(e) => { e.currentTarget.closest(".fo-thumb").style.display = "none"; }}
+                                        />
                                     </button>
                                 ))}
                             </div>
@@ -498,7 +446,7 @@ export default function FoodOrder({ user, onLogout, cart }) {
                         <div className="fo-rating-row">
                             <Stars rating={displayItem.rating || 4.5} />
                             <span className="fo-rating-val">{displayItem.rating || "4.5"}</span>
-                            <span className="fo-rating-ct">· 128 reviews</span>
+                            <span className="fo-rating-ct"><i className="fa-solid fa-circle fo-dot-icon" /> 128 reviews</span>
                         </div>
 
                         <p className="fo-desc">{displayItem.desc}</p>
@@ -508,9 +456,7 @@ export default function FoodOrder({ user, onLogout, cart }) {
                                 {variants.length ? variants[selVariant]?.price : displayItem.price}
                             </span>
                             <span className="fo-prep-time">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                    <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
-                                </svg>
+                                <i className="fa-regular fa-clock" />
                                 {displayItem.prepTime || 20}–{(displayItem.prepTime || 20) + 5} mins{" "}
                                 <span style={{ color: "#C4B09A" }}>Prep Time</span>
                             </span>
@@ -545,11 +491,11 @@ export default function FoodOrder({ user, onLogout, cart }) {
                     </div>
                 </div>
 
-                {/* ══ PART 2 — VARIANTS, ADD-ONS, COUPON, QTY, CTA ══ */}
+                {/* ══ PART 2 — VARIANTS, ADD-ONS, QTY, CTA ══ */}
                 <div className="fo-page2">
 
-                    {/* Variants */}
-                    {variants.length > 0 && (
+                    {/* Variants — only render the picker when there's more than one option */}
+                    {variants.length > 1 && (
                         <div className="fo-section-block">
                             <label className="fo-field-label">Variants</label>
                             <div className="fo-variants">
@@ -572,6 +518,19 @@ export default function FoodOrder({ user, onLogout, cart }) {
                                         </label>
                                     );
                                 })}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Single variant — show as a simple info line, not a picker */}
+                    {variants.length === 1 && (
+                        <div className="fo-section-block">
+                            <label className="fo-field-label">Serving</label>
+                            <div className="fo-variant-single">
+                                <i className="fa-solid fa-bowl-food" />
+                                <span className="fo-variant-single-name">{variants[0].label}</span>
+                                {variants[0].serves && <span className="fo-variant-single-serves">· Serves {variants[0].serves}</span>}
+                                <span className="fo-variant-single-price">{variants[0].price}</span>
                             </div>
                         </div>
                     )}
@@ -619,45 +578,13 @@ export default function FoodOrder({ user, onLogout, cart }) {
                         />
                     </div>
 
-                    {/* ── COUPON ── */}
-                    <div className="fo-section-block">
-                        <label className="fo-field-label">Have a Coupon?</label>
-                        <CouponSection
-                            subtotal={subtotal}
-                            appliedCoupon={appliedCoupon}
-                            onApply={setAppliedCoupon}
-                            onRemove={() => setAppliedCoupon(null)}
-                        />
-                    </div>
-
                     {/* CTA */}
                     <div className="fo-cta-block">
                         <div className="fo-total-section">
-                            {couponDiscount > 0 && (
-                                <>
-                                    <div className="fo-total-row fo-total-row-sub">
-                                        <span className="fo-total-label-sm">Subtotal</span>
-                                        <span className="fo-total-val-sm">₹{subtotal.toLocaleString("en-IN")}</span>
-                                    </div>
-                                    <div className="fo-total-row fo-total-row-discount">
-                                        <span className="fo-total-label-sm">
-                                            <i className="fa-solid fa-ticket" style={{ marginRight: 5 }} />
-                                            Coupon ({appliedCoupon.code})
-                                        </span>
-                                        <span className="fo-total-discount-val">−₹{couponDiscount.toLocaleString("en-IN")}</span>
-                                    </div>
-                                    <div className="fo-total-divider" />
-                                </>
-                            )}
                             <div className="fo-total-row">
                                 <span className="fo-total-label">Total</span>
                                 <span className="fo-total-val">₹{total.toLocaleString("en-IN")}</span>
                             </div>
-                            {couponDiscount > 0 && (
-                                <p className="fo-total-savings-msg">
-                                    <i className="fa-solid fa-circle-check" /> You save ₹{couponDiscount.toLocaleString("en-IN")} with this coupon!
-                                </p>
-                            )}
                         </div>
 
                         <div className="fo-cta-btns">
@@ -710,9 +637,6 @@ export default function FoodOrder({ user, onLogout, cart }) {
                             <div className="fo-ingredients-block">
                                 <p className="fo-field-label" style={{ marginBottom: 12 }}>Ingredients</p>
                                 <p className="fo-ingredients-text">{displayItem.ingredients}</p>
-                                <div className="fo-ing-img-wrap">
-                                    <img src="https://i.postimg.cc/RFqpy42L/Chat-GPT-Image-Jun-13-2026-07-50-20-PM.png" alt="Ingredients" className="fo-ing-img" />
-                                </div>
                             </div>
                         )}
 
@@ -773,12 +697,39 @@ export default function FoodOrder({ user, onLogout, cart }) {
                         </div>
                         <div className="fo-footer-links">
                             {["Privacy Policy", "Terms of Use", "Reservations", "Careers"].map((l) => (
-                                <a key={l} href="#" className="fo-footer-link">{l}</a>
+                                <a
+                                    key={l}
+                                    href="#"
+                                    className="fo-footer-link"
+                                    onClick={(e) => { e.preventDefault(); handleFooterClick(l); }}
+                                >
+                                    {l}
+                                </a>
                             ))}
                         </div>
                         <p className="fo-footer-copy">© 2026 Noir Kitchen. All rights reserved.</p>
                     </div>
                 </footer>
+
+                {/* ── Careers notice toast ── */}
+                {careersMsg && (
+                    <div className="fo-toast">
+                        <i className="fa-solid fa-circle-info" />
+                        Careers page isn't open right now. Please check back later.
+                    </div>
+                )}
+
+                {/* ── Legal modals ── */}
+                <LegalModal
+                    open={legalModal === "privacy"}
+                    title="Privacy Policy"
+                    onClose={() => setLegalModal(null)}
+                />
+                <LegalModal
+                    open={legalModal === "terms"}
+                    title="Terms of Use"
+                    onClose={() => setLegalModal(null)}
+                />
             </div>
 
             <style>{`
@@ -863,11 +814,12 @@ export default function FoodOrder({ user, onLogout, cart }) {
 .fo-rating-row { display: flex; align-items: center; gap: 8px; }
 .fo-stars { display: flex; gap: 2px; align-items: center; }
 .fo-rating-val { font-size: 13px; font-weight: 700; color: #1A1208; }
-.fo-rating-ct { font-size: 12px; color: #9A8570; }
+.fo-rating-ct { font-size: 12px; color: #9A8570; display: inline-flex; align-items: center; gap: 6px; }
+.fo-dot-icon { font-size: 3px; color: #C4B09A; }
 .fo-desc { font-size: 14px; color: #6B5B45; line-height: 1.85; max-width: 480px; }
 .fo-price-row { display: flex; align-items: center; gap: 16px; padding: 16px 20px; background: #fff; border-radius: 14px; border: 1px solid rgba(216,106,28,0.1); box-shadow: 0 3px 14px rgba(0,0,0,0.05); }
 .fo-price-main { font-family: Helvetica, sans-serif; font-size: 34px; font-weight: 600; color: #D86A1C; }
-.fo-prep-time { display: flex; align-items: center; gap: 5px; font-size: 12px; color: #9A8570; margin-left: auto; }
+.fo-prep-time { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #9A8570; margin-left: auto; }
 .fo-tags-row { display: flex; gap: 8px; flex-wrap: wrap; }
 .fo-tag { font-size: 10px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; border-radius: 20px; padding: 4px 12px; }
 .fo-tag-gf { color: #1565C0; background: rgba(21,101,192,0.08); border: 1px solid rgba(21,101,192,0.2); }
@@ -891,7 +843,7 @@ export default function FoodOrder({ user, onLogout, cart }) {
 .fo-vegdot.fo-nonveg .fo-vegdot-inner { background: #D32F2F; }
 .fo-field-label { font-size: 11px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: #9A8570; display: block; }
 
-/* ══ PART 2 — VARIANTS / ADDONS / COUPON / CTA ══ */
+/* ══ PART 2 — VARIANTS / ADDONS / CTA ══ */
 .fo-page2 { max-width: 1320px; margin: 0 auto; padding: 0 48px 48px; display: flex; flex-direction: column; gap: 28px; }
 .fo-section-block { display: flex; flex-direction: column; gap: 14px; }
 .fo-variants { display: flex; flex-direction: column; gap: 10px; }
@@ -907,6 +859,15 @@ export default function FoodOrder({ user, onLogout, cart }) {
 .fo-variant-price-col { text-align: right; }
 .fo-variant-price { font-family: 'Cormorant Garamond', serif; font-size: 20px; font-weight: 600; color: #1A1208; display: block; }
 .fo-variant-diff { font-size: 11px; color: #9A8570; }
+.fo-variant-single {
+  display: flex; align-items: center; gap: 12px;
+  padding: 16px 20px; border-radius: 14px;
+  border: 1.5px solid rgba(216,106,28,0.15); background: #fff;
+}
+.fo-variant-single i { color: #D86A1C; font-size: 16px; }
+.fo-variant-single-name { font-size: 14px; font-weight: 700; color: #1A1208; }
+.fo-variant-single-serves { font-size: 12px; color: #9A8570; }
+.fo-variant-single-price { margin-left: auto; font-family: 'Cormorant Garamond', serif; font-size: 18px; font-weight: 600; color: #D86A1C; }
 .fo-addons-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
 .fo-addon-card { display: flex; align-items: center; gap: 10px; padding: 11px 14px; border-radius: 12px; border: 1.5px solid rgba(216,106,28,0.15); background: #fff; cursor: pointer; transition: border-color 0.2s, background 0.2s; }
 .fo-addon-card:hover { border-color: rgba(216,106,28,0.4); }
@@ -924,80 +885,12 @@ export default function FoodOrder({ user, onLogout, cart }) {
 .fo-textarea:focus { border-color: #D86A1C; }
 .fo-textarea::placeholder { color: #C4B09A; }
 
-/* ── COUPON ── */
-.fo-coupon-wrap { display: flex; flex-direction: column; gap: 8px; }
-.fo-coupon-row { display: flex; gap: 10px; }
-.fo-coupon-input-wrap {
-  flex: 1; display: flex; align-items: center; gap: 10px;
-  background: #fff; border: 1.5px solid rgba(216,106,28,0.2);
-  border-radius: 12px; padding: 0 14px;
-  transition: border-color 0.2s;
-}
-.fo-coupon-input-wrap:focus-within { border-color: #D86A1C; }
-.fo-coupon-input-icon { color: #D86A1C; font-size: 14px; flex-shrink: 0; }
-.fo-coupon-input {
-  flex: 1; border: none; background: transparent; outline: none;
-  font-family: 'Plus Jakarta Sans', sans-serif;
-  font-size: 13px; font-weight: 600; color: #1A1208;
-  letter-spacing: 1px; padding: 12px 0;
-}
-.fo-coupon-input::placeholder { color: #C4B09A; font-weight: 400; letter-spacing: 0; }
-.fo-coupon-btn {
-  flex-shrink: 0; padding: 12px 24px;
-  background: linear-gradient(135deg,#D86A1C,#F0924A);
-  color: #fff; border: none; border-radius: 12px;
-  font-family: 'Plus Jakarta Sans', sans-serif;
-  font-size: 13px; font-weight: 700; cursor: pointer;
-  transition: all 0.2s; box-shadow: 0 4px 14px rgba(216,106,28,0.3);
-  display: flex; align-items: center; justify-content: center; min-width: 80px;
-}
-.fo-coupon-btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(216,106,28,0.4); }
-.fo-coupon-btn:disabled { opacity: 0.7; cursor: wait; }
-.fo-coupon-spinner {
-  width: 14px; height: 14px; border-radius: 50%;
-  border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff;
-  animation: foSpin 0.7s linear infinite;
-}
-.fo-coupon-error { font-size: 12px; color: #D32F2F; font-weight: 500; display: flex; align-items: center; gap: 6px; }
-
-.fo-coupon-applied {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 14px 18px; border-radius: 12px;
-  background: rgba(46,125,50,0.06);
-  border: 1.5px solid rgba(46,125,50,0.25);
-  gap: 12px;
-}
-.fo-coupon-applied-left { display: flex; align-items: center; gap: 12px; }
-.fo-coupon-applied-icon {
-  width: 36px; height: 36px; border-radius: 10px;
-  background: rgba(46,125,50,0.12); color: #2E7D32;
-  display: flex; align-items: center; justify-content: center; font-size: 15px; flex-shrink: 0;
-}
-.fo-coupon-applied-code { font-size: 13px; font-weight: 700; color: #2E7D32; letter-spacing: 1px; display: block; }
-.fo-coupon-applied-desc { font-size: 11px; color: #6B5B45; display: block; margin-top: 2px; }
-.fo-coupon-applied-right { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
-.fo-coupon-savings { font-size: 16px; font-weight: 700; color: #2E7D32; }
-.fo-coupon-remove {
-  width: 28px; height: 28px; border-radius: 50%;
-  background: rgba(211,47,47,0.08); border: 1px solid rgba(211,47,47,0.2);
-  color: #D32F2F; cursor: pointer; font-size: 12px;
-  display: flex; align-items: center; justify-content: center; transition: background 0.2s;
-}
-.fo-coupon-remove:hover { background: rgba(211,47,47,0.15); }
-
 /* ── CTA ── */
 .fo-cta-block { background: #fff; border-radius: 16px; border: 1px solid rgba(216,106,28,0.1); box-shadow: 0 4px 20px rgba(0,0,0,0.06); padding: 20px 24px; display: flex; flex-direction: column; gap: 14px; }
 .fo-total-section { display: flex; flex-direction: column; gap: 8px; }
 .fo-total-row { display: flex; align-items: center; justify-content: space-between; }
-.fo-total-row-sub { opacity: 0.7; }
-.fo-total-row-discount { }
 .fo-total-label { font-size: 11px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: #9A8570; }
-.fo-total-label-sm { font-size: 12px; color: #9A8570; }
 .fo-total-val { font-family: 'Segoe UI', sans-serif; font-size: 32px; font-weight: 600; color: #2c190b; }
-.fo-total-val-sm { font-size: 14px; font-weight: 600; color: #6B5B45; }
-.fo-total-discount-val { font-size: 14px; font-weight: 700; color: #2E7D32; }
-.fo-total-divider { height: 1px; background: rgba(216,106,28,0.1); margin: 4px 0; }
-.fo-total-savings-msg { font-size: 12px; color: #2E7D32; font-weight: 600; display: flex; align-items: center; gap: 6px; background: rgba(46,125,50,0.06); padding: 8px 12px; border-radius: 8px; }
 .fo-cta-btns { display: flex; gap: 12px; }
 .fo-btn-primary { flex: 1; padding: 15px; background: linear-gradient(135deg,#D86A1C,#F0924A); color: #fff; border: none; border-radius: 50px; font-family: 'Plus Jakarta Sans',sans-serif; font-size: 13px; font-weight: 700; cursor: pointer; letter-spacing: 0.5px; box-shadow: 0 8px 24px rgba(216,106,28,0.35); transition: all 0.25s; display: flex; align-items: center; justify-content: center; }
 .fo-btn-primary:hover { transform: translateY(-2px); box-shadow: 0 14px 32px rgba(216,106,28,0.45); }
@@ -1020,9 +913,7 @@ export default function FoodOrder({ user, onLogout, cart }) {
 .fo-info-green { color: #2E7D32 !important; }
 .fo-bottom-row { display: grid; grid-template-columns: 280px 1fr; gap: 40px; align-items: start; }
 .fo-ingredients-block { background: #fff; border-radius: 16px; padding: 24px; border: 1px solid rgba(216,106,28,0.1); box-shadow: 0 3px 14px rgba(0,0,0,0.05); }
-.fo-ingredients-text { font-size: 13px; color: #6B5B45; line-height: 1.8; margin-bottom: 16px; }
-.fo-ing-img-wrap { border-radius: 12px; overflow: hidden; height: 100px; }
-.fo-ing-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.fo-ingredients-text { font-size: 13px; color: #6B5B45; line-height: 1.8; }
 .fo-suggested-block { min-width: 0; }
 .fo-sug-scroll-wrap { position: relative; }
 .fo-sug-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; overflow-x: auto; scroll-behavior: smooth; scrollbar-width: none; }
@@ -1052,9 +943,48 @@ export default function FoodOrder({ user, onLogout, cart }) {
 .fo-logo-text { font-family: 'Cormorant Garamond', serif; font-size: 18px; font-weight: 600; color: #F8F1EA; letter-spacing: 0.3px; }
 .fo-footer-tagline { font-family: 'Cormorant Garamond', serif; font-size: 13px; font-style: italic; color: rgba(248,241,234,0.5); }
 .fo-footer-links { display: flex; gap: 24px; flex-wrap: wrap; justify-content: center; }
-.fo-footer-link { font-size: 12px; color: rgba(248,241,234,0.5); text-decoration: none; transition: color 0.2s; }
+.fo-footer-link { font-size: 12px; color: rgba(248,241,234,0.5); text-decoration: none; transition: color 0.2s; cursor: pointer; }
 .fo-footer-link:hover { color: #F0924A; }
 .fo-footer-copy { font-size: 11px; color: rgba(248,241,234,0.28); }
+
+/* ── TOAST ── */
+.fo-toast {
+  position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%);
+  background: #1A1208; color: #F8F1EA;
+  padding: 14px 24px; border-radius: 12px;
+  font-size: 13px; font-weight: 600;
+  display: flex; align-items: center; gap: 10px;
+  box-shadow: 0 12px 32px rgba(0,0,0,0.3);
+  z-index: 999; animation: foToastIn 0.25s ease;
+}
+.fo-toast i { color: #F0924A; font-size: 14px; }
+@keyframes foToastIn { from { opacity: 0; transform: translate(-50%, 12px); } to { opacity: 1; transform: translate(-50%, 0); } }
+
+/* ── LEGAL MODAL ── */
+.fo-modal-overlay {
+  position: fixed; inset: 0; background: rgba(26,18,8,0.55);
+  backdrop-filter: blur(3px);
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px; z-index: 1000;
+}
+.fo-modal-card {
+  background: #fff; border-radius: 18px; max-width: 520px; width: 100%;
+  max-height: 80vh; display: flex; flex-direction: column;
+  box-shadow: 0 30px 80px rgba(0,0,0,0.35);
+  animation: foModalIn 0.22s ease;
+}
+@keyframes foModalIn { from { opacity: 0; transform: translateY(12px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+.fo-modal-header { display: flex; align-items: center; justify-content: space-between; padding: 22px 24px; border-bottom: 1px solid rgba(216,106,28,0.12); }
+.fo-modal-title-wrap { display: flex; align-items: center; gap: 12px; }
+.fo-modal-icon { color: #D86A1C; font-size: 16px; }
+.fo-modal-title { font-family: 'Cormorant Garamond', serif; font-size: 22px; font-weight: 600; color: #1A1208; }
+.fo-modal-close { width: 32px; height: 32px; border-radius: 50%; border: none; background: rgba(216,106,28,0.08); color: #D86A1C; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.2s; flex-shrink: 0; }
+.fo-modal-close:hover { background: rgba(216,106,28,0.18); }
+.fo-modal-body { padding: 20px 24px; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; }
+.fo-modal-body p { font-size: 13.5px; color: #6B5B45; line-height: 1.8; }
+.fo-modal-footer { padding: 16px 24px 22px; }
+.fo-modal-btn { width: 100%; padding: 13px; background: linear-gradient(135deg,#D86A1C,#F0924A); color: #fff; border: none; border-radius: 50px; font-family: 'Plus Jakarta Sans',sans-serif; font-size: 13px; font-weight: 700; cursor: pointer; transition: transform 0.2s; }
+.fo-modal-btn:hover { transform: translateY(-1px); }
 
 /* ── RESPONSIVE ── */
 @media (max-width: 1200px) {
@@ -1079,8 +1009,6 @@ export default function FoodOrder({ user, onLogout, cart }) {
   .fo-cta-btns { flex-direction: column; }
   .fo-btn-secondary { width: 100%; text-align: center; }
   .fo-addons-grid { grid-template-columns: 1fr; }
-  .fo-coupon-row { flex-direction: column; }
-  .fo-coupon-btn { width: 100%; }
 }
 @media (max-width: 480px) {
   .fo-info-cards { grid-template-columns: repeat(2, 1fr); }

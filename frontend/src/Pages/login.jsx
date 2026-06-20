@@ -156,13 +156,14 @@ export default function LoginPage({ onLoginSuccess, onSwitchToSignup }) {
   };
 
   // ── Google login: show our overlay FIRST, then redirect ──────────────────
-  const handleGoogle = () => {
-    setGoogleLoading(true);
-    // Small delay lets React paint the overlay before browser navigates away
-    setTimeout(() => {
-      window.location.href = `${API}/api/auth/google`;
-    }, 300);
-  };
+  const handleGoogle = async () => {
+  setGoogleLoading(true);
+  try {
+    await fetch(`${API}/health`, { method: "GET", mode: "no-cors" });
+  } catch {
+  }
+  window.location.href = `${API}/api/auth/google`;
+};
 
   const handleMouseMove = e => {
     const card = cardRef.current;

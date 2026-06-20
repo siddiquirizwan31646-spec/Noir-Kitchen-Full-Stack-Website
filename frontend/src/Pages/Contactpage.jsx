@@ -339,7 +339,7 @@ if (!data.success) throw new Error(data.error);
             <div className="ct-map-embed">
   <iframe
     title="Noir Kitchen Location"
-    src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d254.48899474828522!2d75.83314847297858!3d26.91509103074419!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x396db6c90bef9a4f%3A0x88787ad31bd72e2c!2z4KSu4KSo4KSu4KWL4KS54KSoIOCkqOCkruCkleClgOCkqCDgpK3gpKPgpY3gpKHgpL7gpLA!5e1!3m2!1sen!2sin!4v1781185157087!5m2!1sen!2sin"
+    src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d4070.8412060573346!2d75.78047081140839!3d26.942316958719456!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x396db3bf8c2e248f%3A0x3f49c0fe7433cb3c!2sBlock%20B%2C%20Sanjay%20Colony%2C%20Nehru%20Nagar%2C%20Jaipur%2C%20Rajasthan%20302016!5e1!3m2!1sen!2sin!4v1781953014951!5m2!1sen!2sin"
     width="100%"
     height="100%"
     style={{ border: 0, display: "block" }}
@@ -349,7 +349,7 @@ if (!data.success) throw new Error(data.error);
   />
 </div>
 <a
-href="https://www.google.com/maps/dir/?api=1&destination=26.915152915126793, 75.83338752483789"
+href="https://www.google.com/maps/dir/?api=1&destination=26.943000808500063, 75.782729231218"
   target="_blank"
   rel="noopener noreferrer"
   className="ct-directions-btn"

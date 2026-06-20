@@ -77,7 +77,6 @@ app.use('/api/moments', momentRoutes);
 app.use('/api/migrate', require('./routes/migrate'));
 app.use("/api/cart", require("./routes/cart"));
 app.use("/api/connect", require("./routes/connect"));
-app.use("/api/otp", require("./routes/otp"));
 app.use("/api/chefs", chefRoutes);
 app.use("/api/chefs", chefRoutes);
 app.use("/api/coupons", require("./routes/coupons"));

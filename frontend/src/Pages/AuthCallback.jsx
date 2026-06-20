@@ -34,8 +34,9 @@ export default function AuthCallback({ onSuccess }) {
       .then((data) => {
         if (data.success) {
           setStatus("success");
-          // ── KEY FIX: call onSuccess immediately (no delay)
-          // App.jsx sets user state + navigates to /dashboard inside handleLoginSuccess
+          // Flag used by MainHome's GreetingToast to know this is a fresh login
+          localStorage.setItem("justLoggedIn", "1");
+          // App.jsx sets user state + navigates inside handleLoginSuccess
           onSuccess?.({ token, user: data.user });
         } else {
           localStorage.removeItem("token");
