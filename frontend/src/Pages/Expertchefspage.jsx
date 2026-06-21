@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../component/ui/Navbar";
+import CouponTicker from "../component/ui/CouponTicker";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 
@@ -175,8 +176,10 @@ export default function ExpertChefsPage({ user, onLogout, cart }) {
                     alt="" aria-hidden
                     style={{ position: "fixed", inset: 0, width: "100%", height: "100%", objectFit: "cover", zIndex: 0, pointerEvents: "none" }}
                 />
-
-                <Navbar user={user} onLogout={handleLogout} activeNav="Home" setActiveNav={() => {}} cart={cart}/>
+                <div style={{ position: "relative", paddingTop: "32px" }}>
+    <CouponTicker />
+     <Navbar user={user} onLogout={handleLogout} activeNav="Home" setActiveNav={() => {}} cart={cart}/>
+  </div>
 
                 <div className="ec-hero">
                     <p className="ec-eyebrow">NOIR KITCHEN —✦</p>

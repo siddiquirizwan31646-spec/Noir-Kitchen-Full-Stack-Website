@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import Navbar from "../component/ui/Navbar";
+import CouponTicker from "../component/ui/CouponTicker";
 import { Navigate, useNavigate } from "react-router-dom";
 
 const FONT_LINK =
@@ -311,6 +312,8 @@ export default function ElegantAmbience({ user: propUser, onLogout, cart }) {
     <>
       <link href={FONT_LINK} rel="stylesheet" />
       <div className="ea-root">
+        <div style={{ position: "relative", paddingTop: "32px" }}>
+    <CouponTicker />
         <Navbar
           user={user}
           onLogout={() => onLogout?.()}
@@ -318,6 +321,7 @@ export default function ElegantAmbience({ user: propUser, onLogout, cart }) {
           setActiveNav={() => {}}
           cart={cart}
         />
+  </div>
 
         <Hero />
         <Gallery />

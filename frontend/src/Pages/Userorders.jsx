@@ -18,6 +18,7 @@ import {
   faTimesCircle,
 } from "@fortawesome/free-solid-svg-icons";
 import Navbar from "../component/ui/Navbar";
+import CouponTicker from "../component/ui/CouponTicker";
 
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
@@ -372,7 +373,9 @@ function PageShell({ children, navigate, back, user, onLogout, cart, activeNav, 
   return (
     <div className="uo-root">
       <style>{CSS}</style>
-      <Navbar user={user} onLogout={onLogout} activeNav={activeNav} setActiveNav={setActiveNav} cart={cart} />
+      <div style={{ position: "relative", paddingTop: "32px" }}>
+  <CouponTicker /><Navbar user={user} onLogout={onLogout} activeNav={activeNav} setActiveNav={setActiveNav} cart={cart} />
+</div>
       <div className="uo-content">{children}</div>
     </div>
   );

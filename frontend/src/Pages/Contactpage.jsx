@@ -3,6 +3,8 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import Navbar from "../component/ui/Navbar";
+import CouponTicker from "../component/ui/CouponTicker";
+
 import {
   faPhone,
   faLocationDot,
@@ -208,7 +210,8 @@ if (!data.success) throw new Error(data.error);
           }}
         />
 
-        {/* ── Navbar ── */}
+        <div style={{ position: "relative", paddingTop: "32px" }}>
+    <CouponTicker />
         <Navbar
           user={user}
           onLogout={onLogout || (() => { localStorage.removeItem("token"); navigate("/"); })}
@@ -216,6 +219,7 @@ if (!data.success) throw new Error(data.error);
           setActiveNav={() => {}}
           cart={cart}
         />
+  </div>
 
         {/* ══════════ HERO ══════════ */}
         <section className="ct-hero">

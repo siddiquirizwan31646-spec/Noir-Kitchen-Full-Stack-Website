@@ -3,6 +3,8 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import Navbar from "../component/ui/Navbar";
+import CouponTicker from "../component/ui/CouponTicker";
+
 import {
   faStar as faStarSolid,
   faArrowRight,
@@ -311,7 +313,9 @@ const handleLogout = () => {
     }}
   />
 
-
+<div style={{ position: "relative", paddingTop: "32px" }}>
+    <CouponTicker />
+    
 <Navbar
   user={user}
   onLogout={handleLogout}
@@ -319,6 +323,7 @@ const handleLogout = () => {
   cart={cart}
   setActiveNav={() => {}}
 />
+  </div>
 
 <div className="rv-hero">
   <div className="rv-hero-overlay" />

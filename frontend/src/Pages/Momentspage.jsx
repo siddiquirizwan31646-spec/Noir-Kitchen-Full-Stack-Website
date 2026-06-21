@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import Navbar from "../component/ui/Navbar";
+import CouponTicker from "../component/ui/CouponTicker";
 import {
   faCamera, faHeart, faUtensils, faQuoteLeft, faSpinner, faXmark,
 } from "@fortawesome/free-solid-svg-icons";
@@ -199,14 +200,16 @@ export default function MomentsPage({ user, onLogout, cart }) {
             objectFit: "cover", zIndex: 0, pointerEvents: "none",
           }}
         />
-
-        <Navbar
+        <div style={{ position: "relative", paddingTop: "32px" }}>
+    <CouponTicker />
+       <Navbar
           user={user}
           onLogout={onLogout || (() => { localStorage.removeItem("token"); navigate("/"); })}
           activeNav="Home"
           setActiveNav={() => {}}
           cart={cart}
         />
+  </div>
 
         {/* HERO */}
         <section className="mg-hero">

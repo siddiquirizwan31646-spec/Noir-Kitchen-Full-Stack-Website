@@ -3,6 +3,7 @@ import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import Navbar from "../component/ui/Navbar";
+import CouponTicker from "../component/ui/CouponTicker";
 import {
   faUtensils, faLeaf, faStar, faMedal, faUser, faArrowRight,
 } from "@fortawesome/free-solid-svg-icons";
@@ -81,7 +82,11 @@ export default function MainHome({ user, onLogout, cart }) {
       />
 
       <div ref={rootRef} className="ab-root">
+        <div style={{ position: "relative", paddingTop: "32px" }}>
+    <CouponTicker />
         <Navbar user={user} onLogout={handleLogout} activeNav="About" cart={cart} setActiveNav={() => {}} />
+  </div>
+    
 
         {/* ══ SECTION 1 — OUR STORY ══ */}
         <section className="ab-section ab-story-section">

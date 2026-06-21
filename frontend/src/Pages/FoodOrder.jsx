@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import Navbar from "../component/ui/Navbar";
+import CouponTicker from "../component/ui/CouponTicker";
 
 const FONT_LINK =
     "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400;1,600&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap";
@@ -344,7 +345,9 @@ export default function FoodOrder({ user, onLogout, cart }) {
             <link href={FONT_LINK} rel="stylesheet" />
             <link href={FA_LINK} rel="stylesheet" />
             <div className="fo-root">
-                <Navbar user={user} onLogout={handleLogout} activeNav={activeNav} setActiveNav={setActiveNav} cart={cart} />
+                <div style={{ position: "relative", paddingTop: "32px" }}>
+    <CouponTicker /><Navbar user={user} onLogout={handleLogout} activeNav={activeNav} setActiveNav={setActiveNav} cart={cart} />
+  </div>
 
                 {/* ── DELIVERY LOCATION ── */}
                 <div className="fo-location-card">

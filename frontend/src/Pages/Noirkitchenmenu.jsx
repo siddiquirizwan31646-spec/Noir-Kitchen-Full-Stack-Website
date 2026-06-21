@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../component/ui/Navbar";
-
+import CouponTicker from "../component/ui/CouponTicker";
 const FONT_LINK = "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400;1,600&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap";
 const FA_LINK = "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css";
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
@@ -707,7 +707,10 @@ export default function NoirKitchenMenu({ user: propUser, onLogout, cart }) {
       <link href={FONT_LINK} rel="stylesheet" />
       <link href={FA_LINK} rel="stylesheet" />
       <div className="nkm-root">
-        <Navbar user={user} onLogout={() => onLogout?.()} activeNav="Menu" setActiveNav={() => {}} cart={cart} />
+  <div style={{ position: "relative", paddingTop: "32px" }}>
+    <CouponTicker />
+    <Navbar user={user} onLogout={() => onLogout?.()} activeNav="Menu" setActiveNav={() => {}} cart={cart} />
+  </div> 
         <Hero />
 
         {/* ── SEARCH BAR — sits between hero and nav ── */}
