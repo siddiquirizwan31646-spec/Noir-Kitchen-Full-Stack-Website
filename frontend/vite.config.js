@@ -7,5 +7,23 @@ export default defineConfig({
     proxy: {
       '/api': 'http://localhost:5000'
     }
-  }
+  },
+  build: {
+    minify: 'terser',
+    sourcemap: false,
+    chunkSizeWarningLimit: 1000,
+    terserOptions: {
+      compress: {
+        drop_console: true,
+        drop_debugger: true,
+        pure_funcs: ['console.info', 'console.warn', 'console.error'],
+      },
+      mangle: {
+        toplevel: true,
+      },
+      format: {
+        comments: false,
+      },
+    },
+  },
 })
