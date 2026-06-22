@@ -73,6 +73,7 @@ app.use("/api/menu", require("./routes/menu"));
 app.use('/api/reviews', reviewRoutes);
 app.use("/api", webContentRoutes);
 app.use('/api/contact', contactRoute);
+app.use("/api", require("./routes/notifications"));
 app.use('/api/orders', require('./routes/orders'));
 app.use('/api/moments', momentRoutes);
 app.use('/api/migrate', require('./routes/migrate'));
