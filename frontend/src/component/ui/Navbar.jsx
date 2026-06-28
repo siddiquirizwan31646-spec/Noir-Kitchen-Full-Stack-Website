@@ -40,23 +40,19 @@ export default function Navbar({ user, onLogout, activeNav, setActiveNav, cart }
   const [userDropdownOpen,  setUserDropdownOpen]  = useState(false);
   const [notifications,     setNotifications]     = useState([]);
   const [notifOpen,         setNotifOpen]         = useState(false);
-  const [notifDetail,       setNotifDetail]       = useState(null); // null=list, number=detail
-  const seenRef    = useRef(false);
+  const [notifDetail,       setNotifDetail]       = useState(null); 
   const navRef     = useRef(null);
   const animatedIn = useRef(false);
 
-  /* ── Fetch notifications ── */
   useEffect(() => {
-    if (seenRef.current) return;
-    seenRef.current = true;
-    fetch(`${API_BASE}/api/notifications/active`)
-      .then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
-      .then((data) => {
-        const list = Array.isArray(data?.notifications) ? data.notifications : [];
-        setNotifications(list);
-      })
-      .catch((err) => console.error("[Notif]", err.message));
-  }, []);
+  fetch(`${API_BASE}/api/notifications/active`)
+    .then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+    .then((data) => {
+      const list = Array.isArray(data?.notifications) ? data.notifications : [];
+      setNotifications(list);
+    })
+    .catch((err) => console.error("[Notif]", err.message));
+}, []);
 
   const cartItems  = cart?.cartItems || [];
   const totalCount = cartItems.reduce((s, i) => s + i.qty, 0);
