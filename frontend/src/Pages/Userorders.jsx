@@ -148,29 +148,35 @@ export default function UserOrders({ user, onLogout, cart }) {
 
         {/* ── Cancelled Info ── */}
         {isCancelled && (
-          <div className="uo-card uo-cancel-card">
-            <div className="uo-card-title uo-cancel-title">
-              <FontAwesomeIcon icon={faTimesCircle} /> Order Cancelled
-            </div>
-            <div className="uo-cancel-body">
-              {cancelledInfo?.reason && (
-                <div className="uo-cancel-row">
-                  <span className="uo-cancel-label">Reason</span>
-                  <span className="uo-cancel-val">{cancelledInfo.reason}</span>
-                </div>
-              )}
-              {cancelledInfo?.cancelledAt && (
-                <div className="uo-cancel-row">
-                  <span className="uo-cancel-label">Cancelled On</span>
-                  <span className="uo-cancel-val">{fmtDate(cancelledInfo.cancelledAt)}</span>
-                </div>
-              )}
-              {!cancelledInfo && (
-                <p className="uo-cancel-empty">No further details available for this cancellation.</p>
-              )}
-            </div>
-          </div>
-        )}
+  <div className="uo-card uo-cancel-card">
+    <div className="uo-card-title uo-cancel-title">
+      <FontAwesomeIcon icon={faTimesCircle} /> Order Cancelled
+    </div>
+    <div className="uo-cancel-body">
+      {(order.cancelledBy || cancelledInfo?.cancelledBy) && (
+        <div className="uo-cancel-row">
+          <span className="uo-cancel-label">Cancelled By</span>
+          <span className="uo-cancel-val">{order.cancelledBy || cancelledInfo?.cancelledBy}</span>
+        </div>
+      )}
+      {(order.cancelReason || cancelledInfo?.reason) && (
+        <div className="uo-cancel-row">
+          <span className="uo-cancel-label">Reason</span>
+          <span className="uo-cancel-val">{order.cancelReason || cancelledInfo?.reason}</span>
+        </div>
+      )}
+      {(order.updatedAt || cancelledInfo?.cancelledAt) && (
+        <div className="uo-cancel-row">
+          <span className="uo-cancel-label">Cancelled On</span>
+          <span className="uo-cancel-val">{fmtDate(order.updatedAt || cancelledInfo?.cancelledAt)}</span>
+        </div>
+      )}
+      {!order.cancelReason && !order.cancelledBy && !cancelledInfo && (
+        <p className="uo-cancel-empty">No further details available for this cancellation.</p>
+      )}
+    </div>
+  </div>
+)}
 
         {/* ── Status Timeline ── */}
         {!isCancelled && (
