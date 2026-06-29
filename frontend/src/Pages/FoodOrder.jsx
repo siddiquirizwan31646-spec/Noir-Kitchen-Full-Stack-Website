@@ -108,7 +108,13 @@ export default function FoodOrder({ user, onLogout, cart }) {
     const [cartCount, setCartCount] = useState(0);
     const [added, setAdded] = useState(false);
     const [suggested, setSuggested] = useState([]);
-    const [activeNav, setActiveNav] = useState("Menu");
+const [activeNav, setActiveNav] = useState("Menu");
+
+// ── Coupon ──────────────────────────────────────────────────────────────
+const [couponCode, setCouponCode] = useState("");
+const [appliedCoupon, setAppliedCoupon] = useState(null);
+const [couponApplying, setCouponApplying] = useState(false);
+const [couponError, setCouponError] = useState("");
 
     // ── Legal modals ─────────────────────────────────────────────────────────
     const [legalModal, setLegalModal] = useState(null); // "privacy" | "terms" | null
@@ -259,27 +265,71 @@ export default function FoodOrder({ user, onLogout, cart }) {
     }, 0);
 
     const subtotal = (basePrice + addonTotal) * qty;
-    const total = subtotal;
+const total = subtotal;
+const discountAmount = appliedCoupon?.discountAmount || 0;
+const finalTotal = Math.max(0, total - discountAmount);
 
     const handleAddToCart = async () => {
-        if (!item || !cart) return;
-        const success = await cart.addToCart({
-            menuItemId: item._id,
-            name: item.name,
-            img: item.img,
-            price: variants.length ? variants[selVariant].price : item.price,
-            variant: variants.length ? variants[selVariant].label : "",
-            addons: addonList.filter((_, i) => addons[i]),
-            qty,
-            note
-        });
-        if (success) {
-            setAdded(true);
-            setTimeout(() => setAdded(false), 2000);
-        }
-    };
+    if (!item || !cart) return;
+    const success = await cart.addToCart({
+        menuItemId: item._id,
+        name: item.name,
+        img: item.img,
+        price: variants.length ? variants[selVariant].price : item.price,
+        variant: variants.length ? variants[selVariant].label : "",
+        addons: addonList.filter((_, i) => addons[i]),
+        qty,
+        note
+    });
+    if (success) {
+        setAdded(true);
+        setTimeout(() => setAdded(false), 2000);
+    }
+};
 
-    const handleOrderNow = () => {
+// ── Coupon handlers ───────────────────────────────────────────────────
+const handleApplyCoupon = async () => {
+    const code = couponCode.trim();
+    if (!code) {
+        setCouponError("Please enter a coupon code");
+        return;
+    }
+    setCouponApplying(true);
+    setCouponError("");
+    try {
+        const res = await fetch(`${API_BASE}/api/coupons/validate`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ code, orderTotal: total }),
+        });
+        const json = await res.json();
+        if (json.valid) {
+            setAppliedCoupon({
+                code: json.coupon.code,
+                discountAmount: json.discountAmount,
+                discountType: json.coupon.discountType,
+                discountValue: json.coupon.discountValue,
+            });
+            setCouponError("");
+        } else {
+            setAppliedCoupon(null);
+            setCouponError(json.message || "Invalid coupon code");
+        }
+    } catch (err) {
+        setAppliedCoupon(null);
+        setCouponError("Couldn't validate coupon. Please try again.");
+    } finally {
+        setCouponApplying(false);
+    }
+};
+
+const handleRemoveCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponCode("");
+    setCouponError("");
+};
+
+const handleOrderNow = () => {
         if (!coords) {
             document.querySelector(".fo-location-card")?.scrollIntoView({ behavior: "smooth", block: "center" });
             useMyLocation();
@@ -295,19 +345,23 @@ export default function FoodOrder({ user, onLogout, cart }) {
                 `${coords.lat},${coords.lng}`
             )}`,
             {
-                state: {
-                    qty,
-                    note,
-                    selectedVariant: variants.length ? variants[selVariant] : null,
-                    selectedAddons: addonList.filter((_, i) => addons[i]),
-                    itemId: item?._id,
-                    itemImg: item?.img,
-                    discount: item?.discount || null,
-                    latitude: coords.lat,
-                    longitude: coords.lng,
-                    deliveryAddress: resolvedAddress,
-                },
-            }
+    state: {
+        qty,
+        note,
+        selectedVariant: variants.length ? variants[selVariant] : null,
+        selectedAddons: addonList.filter((_, i) => addons[i]),
+        itemId: item?._id,
+        itemImg: item?.img,
+        discount: item?.discount || null,
+        latitude: coords.lat,
+        longitude: coords.lng,
+        deliveryAddress: resolvedAddress,
+        couponCode: appliedCoupon?.code || null,
+        couponDiscountAmount: appliedCoupon?.discountAmount || 0,
+        couponDiscountType: appliedCoupon?.discountType || null,
+        couponDiscountValue: appliedCoupon?.discountValue || 0,
+    },
+}
         );
     };
 
@@ -582,28 +636,89 @@ export default function FoodOrder({ user, onLogout, cart }) {
                     </div>
 
                     {/* CTA */}
-                    <div className="fo-cta-block">
-                        <div className="fo-total-section">
-                            <div className="fo-total-row">
-                                <span className="fo-total-label">Total</span>
-                                <span className="fo-total-val">₹{total.toLocaleString("en-IN")}</span>
-                            </div>
-                        </div>
+<div className="fo-cta-block">
 
-                        <div className="fo-cta-btns">
-                            <button onClick={handleAddToCart} className={`fo-btn-primary ${added ? "fo-btn-added" : ""}`}>
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: 8 }}>
-                                    <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z" /><line x1="3" y1="6" x2="21" y2="6" /><path d="M16 10a4 4 0 01-8 0" />
-                                </svg>
-                                {added ? (<><i className="fa-solid fa-check" style={{ marginRight: 6 }} /> Added to Cart</>) : "Add to Cart"}
-                            </button>
-                            <button className="fo-btn-secondary" onClick={handleOrderNow}>
-                                {coords ? "Order Now" : (
-                                    <><i className="fa-solid fa-location-crosshairs" style={{ marginRight: 6 }} /> Enable Location</>
-                                )}
-                            </button>
-                        </div>
+    {/* ── Coupon ── */}
+    <div className="fo-coupon-wrap">
+        {!appliedCoupon ? (
+            <>
+                <div className="fo-coupon-input-row">
+                    <i className="fa-solid fa-ticket fo-coupon-icon" />
+                    <input
+                        type="text"
+                        className="fo-coupon-input"
+                        placeholder="Enter coupon code"
+                        value={couponCode}
+                        onChange={(e) => { setCouponCode(e.target.value.toUpperCase()); setCouponError(""); }}
+                        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleApplyCoupon(); } }}
+                        disabled={couponApplying}
+                    />
+                    <button
+                        type="button"
+                        className="fo-coupon-apply-btn"
+                        onClick={handleApplyCoupon}
+                        disabled={couponApplying || !couponCode.trim()}
+                    >
+                        {couponApplying ? "Checking…" : "Apply"}
+                    </button>
+                </div>
+                {couponError && (
+                    <span className="fo-coupon-error">
+                        <i className="fa-solid fa-circle-exclamation" /> {couponError}
+                    </span>
+                )}
+            </>
+        ) : (
+            <div className="fo-coupon-applied">
+                <div className="fo-coupon-applied-left">
+                    <i className="fa-solid fa-ticket fo-coupon-icon-ok" />
+                    <div>
+                        <span className="fo-coupon-applied-code">{appliedCoupon.code}</span>
+                        <span className="fo-coupon-applied-sub">
+                            {appliedCoupon.discountType === "Percentage"
+                                ? `${appliedCoupon.discountValue}% off applied`
+                                : `Flat ₹${appliedCoupon.discountValue} off applied`}
+                        </span>
                     </div>
+                </div>
+                <button type="button" className="fo-coupon-remove-btn" onClick={handleRemoveCoupon}>
+                    <i className="fa-solid fa-xmark" />
+                </button>
+            </div>
+        )}
+    </div>
+
+    <div className="fo-total-section">
+        <div className="fo-total-row">
+            <span className="fo-total-label">Total</span>
+            <span className="fo-total-val">
+                {discountAmount > 0 && (
+                    <span className="fo-total-strike">₹{total.toLocaleString("en-IN")}</span>
+                )}
+                ₹{finalTotal.toLocaleString("en-IN")}
+            </span>
+        </div>
+        {discountAmount > 0 && (
+            <div className="fo-total-savings">
+                <i className="fa-solid fa-tag" /> You saved ₹{discountAmount.toLocaleString("en-IN")}
+            </div>
+        )}
+    </div>
+
+    <div className="fo-cta-btns">
+        <button onClick={handleAddToCart} className={`fo-btn-primary ${added ? "fo-btn-added" : ""}`}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: 8 }}>
+                <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z" /><line x1="3" y1="6" x2="21" y2="6" /><path d="M16 10a4 4 0 01-8 0" />
+            </svg>
+            {added ? (<><i className="fa-solid fa-check" style={{ marginRight: 6 }} /> Added to Cart</>) : "Add to Cart"}
+        </button>
+        <button className="fo-btn-secondary" onClick={handleOrderNow}>
+            {coords ? "Order Now" : (
+                <><i className="fa-solid fa-location-crosshairs" style={{ marginRight: 6 }} /> Enable Location</>
+            )}
+        </button>
+    </div>
+</div>
                 </div>
 
                 {/* ══ PART 3 — DISH DETAILS + SUGGESTED ══ */}
@@ -888,12 +1003,31 @@ export default function FoodOrder({ user, onLogout, cart }) {
 .fo-textarea:focus { border-color: #D86A1C; }
 .fo-textarea::placeholder { color: #C4B09A; }
 
-/* ── CTA ── */
 .fo-cta-block { background: #fff; border-radius: 16px; border: 1px solid rgba(216,106,28,0.1); box-shadow: 0 4px 20px rgba(0,0,0,0.06); padding: 20px 24px; display: flex; flex-direction: column; gap: 14px; }
+
+.fo-coupon-wrap { display: flex; flex-direction: column; gap: 8px; }
+.fo-coupon-input-row { display: flex; align-items: center; gap: 10px; background: #F8F1EA; border: 1.5px solid rgba(216,106,28,0.2); border-radius: 12px; padding: 0 14px; }
+.fo-coupon-icon { color: #D86A1C; font-size: 13px; flex-shrink: 0; }
+.fo-coupon-input { flex: 1; border: none; background: transparent; outline: none; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 13px; color: #1A1208; padding: 12px 0; text-transform: uppercase; }
+.fo-coupon-input::placeholder { color: #C4B09A; text-transform: none; }
+.fo-coupon-apply-btn { flex-shrink: 0; font-size: 12px; font-weight: 700; color: #fff; background: linear-gradient(135deg,#D86A1C,#F0924A); border: none; border-radius: 20px; padding: 8px 18px; cursor: pointer; transition: transform 0.2s; white-space: nowrap; }
+.fo-coupon-apply-btn:hover:not(:disabled) { transform: translateY(-1px); }
+.fo-coupon-apply-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.fo-coupon-error { font-size: 11px; color: #D32F2F; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+.fo-coupon-applied { display: flex; align-items: center; justify-content: space-between; background: rgba(46,125,50,0.06); border: 1.5px solid rgba(46,125,50,0.25); border-radius: 12px; padding: 10px 14px; }
+.fo-coupon-applied-left { display: flex; align-items: center; gap: 10px; }
+.fo-coupon-icon-ok { color: #2E7D32; font-size: 15px; }
+.fo-coupon-applied-code { display: block; font-size: 13px; font-weight: 700; color: #1A1208; }
+.fo-coupon-applied-sub { display: block; font-size: 11px; color: #2E7D32; margin-top: 1px; }
+.fo-coupon-remove-btn { width: 26px; height: 26px; border-radius: 50%; border: none; background: rgba(211,47,47,0.1); color: #D32F2F; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 11px; flex-shrink: 0; transition: background 0.2s; }
+.fo-coupon-remove-btn:hover { background: rgba(211,47,47,0.2); }
+
 .fo-total-section { display: flex; flex-direction: column; gap: 8px; }
 .fo-total-row { display: flex; align-items: center; justify-content: space-between; }
 .fo-total-label { font-size: 11px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: #9A8570; }
 .fo-total-val { font-family: 'Segoe UI', sans-serif; font-size: 32px; font-weight: 600; color: #2c190b; }
+.fo-total-strike { text-decoration: line-through; color: #C4B09A; font-size: 18px; margin-right: 8px; font-weight: 500; }
+.fo-total-savings { font-size: 11px; font-weight: 700; color: #2E7D32; display: flex; align-items: center; gap: 6px; }
 .fo-cta-btns { display: flex; gap: 12px; }
 .fo-btn-primary { flex: 1; padding: 15px; background: linear-gradient(135deg,#D86A1C,#F0924A); color: #fff; border: none; border-radius: 50px; font-family: 'Plus Jakarta Sans',sans-serif; font-size: 13px; font-weight: 700; cursor: pointer; letter-spacing: 0.5px; box-shadow: 0 8px 24px rgba(216,106,28,0.35); transition: all 0.25s; display: flex; align-items: center; justify-content: center; }
 .fo-btn-primary:hover { transform: translateY(-2px); box-shadow: 0 14px 32px rgba(216,106,28,0.45); }
