@@ -541,9 +541,17 @@ if (json.success || json.orderId || json._id) {
                                     <span className="off-summary-val">{decodedFood}</span>
                                 </div>
                                 <div className="off-summary-item">
-                                    <span className="off-summary-label">Total</span>
-                                    <span className="off-summary-total">₹{finalAmount.toLocaleString("en-IN")}</span>
-                                </div>
+    <span className="off-summary-label">Total</span>
+    <span className="off-summary-total">₹{finalAmount.toLocaleString("en-IN")}</span>
+</div>
+{couponCode && couponDiscount > 0 && (
+    <div className="off-summary-item">
+        <span className="off-summary-label">Coupon</span>
+        <span className="off-summary-val" style={{ color: "#2E7D32" }}>
+            {couponCode} (− ₹{couponDiscount.toLocaleString("en-IN")})
+        </span>
+    </div>
+)}
                                 <div className="off-summary-item">
                                     <span className="off-summary-label">Payment</span>
                                     <span className="off-summary-val">Cash on Delivery</span>
