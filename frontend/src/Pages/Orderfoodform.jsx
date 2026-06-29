@@ -134,10 +134,14 @@ export default function OrderFoodForm({ user: propUser, onLogout, cart }) {
     const orderState = location.state || {};
 
     const qty             = orderState.qty || 1;
-    const note            = orderState.note || "";
-    const selectedVariant = orderState.selectedVariant || null;
-    const selectedAddons  = orderState.selectedAddons || [];
-    const itemImg         = orderState.itemImg || "";
+const note            = orderState.note || "";
+const selectedVariant = orderState.selectedVariant || null;
+const selectedAddons  = orderState.selectedAddons || [];
+const itemImg         = orderState.itemImg || "";
+const couponCode           = orderState.couponCode || null;
+const couponDiscountAmount = orderState.couponDiscountAmount || 0;
+const couponDiscountType   = orderState.couponDiscountType || null;
+const couponDiscountValue  = orderState.couponDiscountValue || 0;
     const user            = propUser || { name: customerName || "Guest", email: "" };
     const decodedFood     = decodeURIComponent(foodName || "");
     const decodedPrice    = decodeURIComponent(price || "0");
@@ -244,14 +248,17 @@ export default function OrderFoodForm({ user: propUser, onLogout, cart }) {
     const addonTotal = selectedAddons.reduce((s, a) => s + (parseInt(String(a.price || "0").replace(/[^\d]/g, "")) || 0), 0);
     const subtotalBeforeGst = (rawPrice + addonTotal) * qty;
 
-    const gstAmount   = Math.round(subtotalBeforeGst * GST_RATE);
-    const totalAmount = subtotalBeforeGst + gstAmount;
+   const gstAmount   = Math.round(subtotalBeforeGst * GST_RATE);
+const totalAmount = subtotalBeforeGst + gstAmount;
 
-    // Legacy item-level discount (kept for backward compat)
-    const itemDiscount       = orderState.discount || item?.discount || null;
-    const itemDiscountAmount = itemDiscount ? Math.round(totalAmount * (parseInt(itemDiscount) / 100)) : 0;
-    const finalAmount        = totalAmount - itemDiscountAmount;
+// Legacy item-level discount (kept for backward compat)
+const itemDiscount       = orderState.discount || item?.discount || null;
+const itemDiscountAmount = itemDiscount ? Math.round(totalAmount * (parseInt(itemDiscount) / 100)) : 0;
 
+// Coupon discount (applied on previous page)
+const couponDiscount = Math.round(couponDiscountAmount) || 0;
+
+const finalAmount = Math.max(0, totalAmount - itemDiscountAmount - couponDiscount);
     const handleChange = e => {
         const { name, value } = e.target;
         setForm(f => ({ ...f, [name]: value }));
@@ -278,46 +285,63 @@ export default function OrderFoodForm({ user: propUser, onLogout, cart }) {
         setSubmitting(true);
         try {
             const token = localStorage.getItem("token");
-            const payload = {
-                email:               user?.email || "",
-                foodId:              orderState.itemId || item?._id || null,
-                itemName:            decodedFood,
-                variant:             selectedVariant?.label || "Standard",
-                addons:              selectedAddons.map(a => `${a.label} (${a.price})`).join(", "),
-                quantity:            qty,
-                specialInstructions: note,
-                orderDateTime:       now.toISOString(),
-                paymentMethod:       "Cash",
-                baseAmount:          rawPrice,
-                addonTotal,
-                gstAmount,
-                totalAmount:         finalAmount,
-                discountApplied:     itemDiscount ? `${itemDiscount}% off` : "None",
-                estimatedDelivery:   ESTIMATED_DELIVERY,
-                customerId:          user?._id || user?.id || null,
-                fullName:            form.fullName.trim(),
-                mobile:              form.mobile.trim(),
-                deliveryAddress:     resolvedAddress,
-                latitude:            coords.lat,
-                longitude:           coords.lng,
-                orderStatus:         "Placed",
-                deliveryPartner:     null,
-            };
+           const payload = {
+    email:               user?.email || "",
+    foodId:              orderState.itemId || item?._id || null,
+    itemName:            decodedFood,
+    variant:             selectedVariant?.label || "Standard",
+    addons:              selectedAddons.map(a => `${a.label} (${a.price})`).join(", "),
+    quantity:            qty,
+    specialInstructions: note,
+    orderDateTime:       now.toISOString(),
+    paymentMethod:       "Cash",
+    baseAmount:          rawPrice,
+    addonTotal,
+    gstAmount,
+    totalAmount:         finalAmount,
+    discountApplied:     itemDiscount ? `${itemDiscount}% off` : "None",
+    couponCode:          couponCode || null,
+    discountType:        couponCode ? couponDiscountType : "None",
+    discountValue:       couponCode ? couponDiscountValue : 0,
+    discountAmount:      couponDiscount,
+    estimatedDelivery:   ESTIMATED_DELIVERY,
+    customerId:          user?._id || user?.id || null,
+    fullName:            form.fullName.trim(),
+    mobile:              form.mobile.trim(),
+    deliveryAddress:     resolvedAddress,
+    latitude:            coords.lat,
+    longitude:           coords.lng,
+    orderStatus:         "Placed",
+    deliveryPartner:     null,
+};
 
-            const res  = await fetch(`${API_BASE}/api/orders`, {
+const res  = await fetch(`${API_BASE}/api/orders`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    body: JSON.stringify(payload),
+});
+const json = await res.json();
+if (json.success || json.orderId || json._id) {
+    // Redeem the coupon (increment usedCount) only after order is confirmed
+    if (couponCode) {
+        try {
+            await fetch(`${API_BASE}/api/coupons/redeem`, {
                 method: "POST",
-                headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-                body: JSON.stringify(payload),
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ code: couponCode, customerId: user?._id || user?.id || null }),
             });
-            const json = await res.json();
-            if (json.success || json.orderId || json._id) {
-                setDeliveryOtp(json.deliveryOtp);
-                setOrderId(json.orderId || json._id || "NK" + Date.now());
-                setSubmitted(true);
-                window.scrollTo({ top: 0, behavior: "smooth" });
-            } else {
-                throw new Error(json.message || "Order failed");
-            }
+        } catch (redeemErr) {
+            console.error("Coupon redeem failed:", redeemErr);
+            // Don't block order success on redeem failure
+        }
+    }
+    setDeliveryOtp(json.deliveryOtp);
+    setOrderId(json.orderId || json._id || "NK" + Date.now());
+    setSubmitted(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+} else {
+    throw new Error(json.message || "Order failed");
+}
         } catch (err) {
             alert("Something went wrong: " + err.message);
         } finally {
@@ -360,9 +384,12 @@ export default function OrderFoodForm({ user: propUser, onLogout, cart }) {
                             </div>
                         )}
                         <div className="off-success-details">
-                            <div className="off-suc-row"><span>Item</span><strong>{decodedFood}</strong></div>
-                            <div className="off-suc-row"><span>Total Paid</span><strong>₹{finalAmount.toLocaleString("en-IN")}</strong></div>
-                            <div className="off-suc-row"><span>Payment</span><strong>Cash on Delivery</strong></div>
+    <div className="off-suc-row"><span>Item</span><strong>{decodedFood}</strong></div>
+    {couponCode && couponDiscount > 0 && (
+        <div className="off-suc-row"><span>Coupon Applied</span><strong style={{color:"#2E7D32"}}>{couponCode} (− ₹{couponDiscount.toLocaleString("en-IN")})</strong></div>
+    )}
+    <div className="off-suc-row"><span>Total Paid</span><strong>₹{finalAmount.toLocaleString("en-IN")}</strong></div>
+    <div className="off-suc-row"><span>Payment</span><strong>Cash on Delivery</strong></div>
                             <div className="off-suc-row"><span>Delivery to</span><strong style={{maxWidth:220,textAlign:"right",fontSize:12}}>{resolvedAddress.split(",").slice(0,3).join(", ")}</strong></div>
                             <div className="off-suc-row"><span>Estimated Time</span><strong>{ESTIMATED_DELIVERY}</strong></div>
                             <div className="off-suc-row">
@@ -448,15 +475,24 @@ export default function OrderFoodForm({ user: propUser, onLogout, cart }) {
                                     </div>
                                 </div>
                                 <div className="off-price-breakdown">
-                                    <div className="off-price-row"><span>Item Price × {qty}</span><span>₹{(rawPrice * qty).toLocaleString("en-IN")}</span></div>
-                                    {addonTotal > 0 && <div className="off-price-row"><span>Add-ons</span><span>+ ₹{(addonTotal * qty).toLocaleString("en-IN")}</span></div>}
-                                    <div className="off-price-row"><span>GST (18%)</span><span>+ ₹{gstAmount.toLocaleString("en-IN")}</span></div>
-                                    {itemDiscountAmount > 0 && (
-                                        <div className="off-price-row off-price-discount"><span>Discount ({itemDiscount}% off)</span><span>− ₹{itemDiscountAmount.toLocaleString("en-IN")}</span></div>
-                                    )}
-                                    <div className="off-price-divider" />
-                                    <div className="off-price-row off-price-total"><span>Total Amount</span><span>₹{finalAmount.toLocaleString("en-IN")}</span></div>
-                                </div>
+    <div className="off-price-row"><span>Item Price × {qty}</span><span>₹{(rawPrice * qty).toLocaleString("en-IN")}</span></div>
+    {addonTotal > 0 && <div className="off-price-row"><span>Add-ons</span><span>+ ₹{(addonTotal * qty).toLocaleString("en-IN")}</span></div>}
+    <div className="off-price-row"><span>GST (18%)</span><span>+ ₹{gstAmount.toLocaleString("en-IN")}</span></div>
+    {itemDiscountAmount > 0 && (
+        <div className="off-price-row off-price-discount"><span>Discount ({itemDiscount}% off)</span><span>− ₹{itemDiscountAmount.toLocaleString("en-IN")}</span></div>
+    )}
+    {couponCode && couponDiscount > 0 && (
+        <div className="off-price-row off-price-discount off-price-coupon-row">
+            <span>
+                <i className="fa-solid fa-ticket" style={{ marginRight: 6, fontSize: 11 }} />
+                Coupon ({couponCode})
+            </span>
+            <span>− ₹{couponDiscount.toLocaleString("en-IN")}</span>
+        </div>
+    )}
+    <div className="off-price-divider" />
+    <div className="off-price-row off-price-total"><span>Total Amount</span><span>₹{finalAmount.toLocaleString("en-IN")}</span></div>
+</div>
                             </div>
                         </div>
 
@@ -610,6 +646,7 @@ const STYLES = `
 .off-price-breakdown { display: flex; flex-direction: column; gap: 10px; }
 .off-price-row { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: #6B5B45; }
 .off-price-discount { color: #2E7D32; }
+.off-price-coupon-row span:first-child { display: flex; align-items: center; }
 .off-price-total { font-family: 'Cormorant Garamond', serif; font-size: 20px; font-weight: 600; color: #1A1208; }
 .off-price-divider { height: 1px; background: linear-gradient(90deg, transparent, rgba(216,106,28,0.2), transparent); margin: 4px 0; }
 
